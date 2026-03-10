@@ -1,0 +1,672 @@
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  FaGlassCheers,
+  FaBuilding,
+  FaBirthdayCake,
+  FaUtensils,
+  FaCamera,
+  FaPaintBrush,
+  FaMusic,
+  FaCampground,
+  FaGamepad,
+  FaSearch,
+  FaSadTear,
+  FaStar,
+  FaTimes,
+  FaCheckCircle,
+} from "react-icons/fa";
+import { toast } from "react-hot-toast";
+import useAuth from "../context/useAuth";
+import BookingModal from "../components/BookingModal";
+
+const Services = () => {
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priceRange, setPriceRange] = useState([0, 100000]);
+  const [selectedRating, setSelectedRating] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  const [bookedServiceId, setBookedServiceId] = useState(null);
+
+  const items = [
+    {
+      id: "wedding-1",
+      title: "Wedding Planning",
+      desc: "End-to-end planning and coordination.",
+      icon: FaGlassCheers,
+      color: "bg-pink-50 text-pink-600",
+      img: "/wedding.jpg",
+      category: "wedding",
+      price: 75000,
+      rating: 5,
+    },
+    {
+      id: "corporate-1",
+      title: "Corporate Events",
+      desc: "Conferences, retreats, and product launches.",
+      icon: FaBuilding,
+      color: "bg-indigo-50 text-indigo-600",
+      img: "/restaurant.jpg",
+      category: "corporate",
+      price: 50000,
+      rating: 4,
+    },
+    {
+      id: "birthday-1",
+      title: "Birthday Parties",
+      desc: "Themes, décor, and entertainment.",
+      icon: FaBirthdayCake,
+      color: "bg-amber-50 text-amber-600",
+      img: "/birthday.jpg",
+      category: "birthday",
+      price: 25000,
+      rating: 5,
+    },
+    {
+      id: "catering-1",
+      title: "Catering",
+      desc: "Custom menus and full-service catering.",
+      icon: FaUtensils,
+      color: "bg-rose-50 text-rose-600",
+      img: "/party.jpg",
+      category: "catering",
+      price: 30000,
+      rating: 4,
+    },
+    {
+      id: "photography-1",
+      title: "Photography",
+      desc: "Professional photo and video coverage.",
+      icon: FaCamera,
+      color: "bg-blue-50 text-blue-600",
+      img: "/anniversary.jpg",
+      category: "photography",
+      price: 15000,
+      rating: 5,
+    },
+    {
+      id: "decoration-1",
+      title: "Decoration",
+      desc: "Themed décor and floral arrangements.",
+      icon: FaPaintBrush,
+      color: "bg-emerald-50 text-emerald-600",
+      img: "/gamenight.jpg",
+      category: "decoration",
+      price: 20000,
+      rating: 4,
+    },
+    {
+      id: "concert-1",
+      title: "Music Concerts",
+      desc: "Live music events and concert planning.",
+      icon: FaMusic,
+      color: "bg-purple-50 text-purple-600",
+      img: "/camping.jpg",
+      category: "concert",
+      price: 85000,
+      rating: 5,
+    },
+    {
+      id: "camping-1",
+      title: "Camping Trips",
+      desc: "Outdoor adventures and camping events.",
+      icon: FaCampground,
+      color: "bg-green-50 text-green-600",
+      img: "/camping.jpg",
+      category: "camping",
+      price: 35000,
+      rating: 4,
+    },
+    {
+      id: "gaming-1",
+      title: "Game Nights",
+      desc: "Fun gaming events and tournaments.",
+      icon: FaGamepad,
+      color: "bg-orange-50 text-orange-600",
+      img: "/gamenight.jpg",
+      category: "gaming",
+      price: 10000,
+      rating: 3,
+    },
+    {
+      id: "anniversary-1",
+      title: "Anniversary Celebrations",
+      desc: "Special milestone event planning.",
+      icon: FaGlassCheers,
+      color: "bg-red-50 text-red-600",
+      img: "/anniversary.jpg",
+      category: "anniversary",
+      price: 40000,
+      rating: 5,
+    },
+  ];
+
+  const categories = [
+    { value: "wedding", label: "Wedding" },
+    { value: "corporate", label: "Corporate" },
+    { value: "birthday", label: "Birthday" },
+    { value: "catering", label: "Catering" },
+    { value: "photography", label: "Photography" },
+    { value: "decoration", label: "Decoration" },
+    { value: "concert", label: "Concert" },
+    { value: "camping", label: "Camping" },
+    { value: "gaming", label: "Gaming" },
+    { value: "anniversary", label: "Anniversary" },
+  ];
+
+  // Handle booking button click
+  const handleBookClick = (service) => {
+    // Check if user is logged in - check both context and localStorage
+    const storedToken = localStorage.getItem("token");
+    const isLoggedIn = storedToken || token;
+    
+    if (!isLoggedIn) {
+      // User is not logged in - save intended service and redirect to login
+      localStorage.setItem("pendingBooking", JSON.stringify(service));
+      navigate("/login", { state: { from: "/services" } });
+      toast.error("Please login to book this service");
+      return;
+    }
+    
+    // User is logged in - open booking modal
+    setSelectedService(service);
+    setIsBookingModalOpen(true);
+  };
+
+  // Handle successful booking
+  const handleBookingSuccess = (booking) => {
+    setBookedServiceId(booking.serviceId);
+    toast.success("Booking confirmed! Check your dashboard for details.");
+  };
+
+  // Check for pending booking after login
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token");
+    const pendingBooking = localStorage.getItem("pendingBooking");
+    
+    if (storedToken && pendingBooking) {
+      try {
+        const service = JSON.parse(pendingBooking);
+        setSelectedService(service);
+        setIsBookingModalOpen(true);
+        // Clear pending booking so it doesn't reopen on refresh
+        localStorage.removeItem("pendingBooking");
+      } catch (e) {
+        console.error("Failed to parse pending booking:", e);
+        localStorage.removeItem("pendingBooking");
+      }
+    }
+  }, []);
+
+  // Filter services based on all criteria
+  const filteredItems = items.filter((item) => {
+    // Search query filter
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch = !query || 
+      item.title.toLowerCase().includes(query) ||
+      item.category.toLowerCase().includes(query) ||
+      item.desc.toLowerCase().includes(query);
+
+    // Price range filter
+    const matchesPrice = item.price >= priceRange[0] && item.price <= priceRange[1];
+
+    // Rating filter
+    const matchesRating = !selectedRating || item.rating >= parseInt(selectedRating);
+
+    // Category filter
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
+
+    return matchesSearch && matchesPrice && matchesRating && matchesCategory;
+  });
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setPriceRange([0, 100000]);
+    setSelectedRating("");
+    setSelectedCategory("");
+  };
+
+  const hasActiveFilters = searchQuery || priceRange[1] < 100000 || selectedRating || selectedCategory;
+
+  // Format price to Indian format
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
+
+  return (
+    <>
+      <section className="bg-gray-100">
+        <div className="max-w-7xl mx-auto px-6 py-16">
+          <div className="rounded-2xl bg-gray-50 ring-1 ring-gray-200 px-8 py-12">
+            <h1 className="text-3xl md:text-5xl font-semibold text-gray-900">Our Event Services</h1>
+            <p className="mt-3 text-gray-600 max-w-2xl">
+              Discover a full range of services to plan, manage, and elevate your
+              events with ease and confidence.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content with Filters and Services Grid */}
+      <section className="max-w-7xl mx-auto px-6 py-8" style={{ backgroundColor: '#f3f4f6' }}>
+        <div style={{ display: 'flex', gap: '32px' }}>
+          
+          {/* Filters Sidebar */}
+          <div style={{
+            width: '280px',
+            flexShrink: 0,
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            height: 'fit-content',
+            position: 'sticky',
+            top: '20px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1e40af' }}>Filters</h3>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  style={{
+                    fontSize: '12px',
+                    color: '#a2783a',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Search Input */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
+                Search
+              </label>
+              <div style={{ position: 'relative' }}>
+                <FaSearch style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                }} />
+                <input
+                  type="text"
+                  placeholder="Service name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px 10px 38px',
+                    fontSize: '14px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    backgroundColor: '#f9fafb',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a2783a';
+                    e.target.style.boxShadow = '0 0 0 2px rgba(162, 120, 58, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Price Range Slider */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
+                Price Range
+              </label>
+              <div style={{ marginBottom: '8px' }}>
+                <input
+                  type="range"
+                  min="0"
+                  max="100000"
+                  step="5000"
+                  value={priceRange[1]}
+                  onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, #a2783a 0%, #a2783a ${(priceRange[1] / 100000) * 100}%, #e5e7eb ${(priceRange[1] / 100000) * 100}%, #e5e7eb 100%)`,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280' }}>
+                <span>₹0</span>
+                <span style={{ fontWeight: '500', color: '#a2783a' }}>{formatPrice(priceRange[1])}</span>
+                <span>₹1,00,000</span>
+              </div>
+            </div>
+
+            {/* Rating Filter */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '12px' }}>
+                Rating
+              </label>
+              {[
+                { value: "5", label: "5+ Stars" },
+                { value: "4", label: "4+ Stars" },
+                { value: "3", label: "3+ Stars" },
+              ].map((rating) => (
+                <label
+                  key={rating.value}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#374151',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="rating"
+                    value={rating.value}
+                    checked={selectedRating === rating.value}
+                    onChange={(e) => setSelectedRating(e.target.value)}
+                    style={{
+                      marginRight: '10px',
+                      accentColor: '#a2783a',
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer',
+                    }}
+                  />
+                  <FaStar style={{ color: '#fbbf24', marginRight: '6px', fontSize: '12px' }} />
+                  {rating.label}
+                </label>
+              ))}
+            </div>
+
+            {/* Category Filter */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '12px' }}>
+                Category
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {categories.map((cat) => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setSelectedCategory(selectedCategory === cat.value ? "" : cat.value)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      borderRadius: '20px',
+                      border: selectedCategory === cat.value ? '2px solid #a2783a' : '1px solid #e5e7eb',
+                      backgroundColor: selectedCategory === cat.value ? '#fef3e6' : 'white',
+                      color: selectedCategory === cat.value ? '#a2783a' : '#6b7280',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      fontWeight: selectedCategory === cat.value ? '500' : '400',
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Services Grid */}
+          <div style={{ flex: 1 }}>
+            {/* Results count */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px',
+            }}>
+              <p style={{ color: '#6b7280', fontSize: '14px' }}>
+                {filteredItems.length > 0 
+                  ? `Showing ${filteredItems.length} of ${items.length} services`
+                  : 'No services found'
+                }
+              </p>
+            </div>
+
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+              gap: '24px' 
+            }}>
+              {filteredItems.length > 0 ? (
+                filteredItems.map((s) => (
+                  <div key={s.id} style={{
+                    backgroundColor: 'white',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }} className="service-card">
+                    <div style={{ 
+                      position: 'relative', 
+                      width: '100%', 
+                      height: '180px',
+                      overflow: 'hidden'
+                    }}>
+                      <img 
+                        src={s.img} 
+                        alt={s.title} 
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '12px',
+                        left: '12px',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }} className={s.color}>
+                        <s.icon />
+                      </div>
+                      {/* Rating Badge */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                      }}>
+                        <FaStar style={{ color: '#fbbf24' }} />
+                        {s.rating}.0
+                      </div>
+                      {/* Booked Badge */}
+                      {bookedServiceId === s.id && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '12px',
+                          left: '12px',
+                          backgroundColor: '#10b981',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          color: 'white',
+                        }}>
+                          <FaCheckCircle /> Booked
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <h3 style={{ 
+                        fontSize: '18px', 
+                        fontWeight: '600', 
+                        marginBottom: '8px',
+                        color: '#1f2937'
+                      }}>{s.title}</h3>
+                      <p style={{ 
+                        fontSize: '14px', 
+                        color: '#6b7280', 
+                        marginBottom: '8px',
+                        flex: 1
+                      }}>{s.desc}</p>
+                      <p style={{ 
+                        fontSize: '16px', 
+                        fontWeight: '600', 
+                        color: '#a2783a',
+                        marginBottom: '12px'
+                      }}>
+                        Starting from {formatPrice(s.price)}
+                      </p>
+                      <button
+                        onClick={() => handleBookClick(s)}
+                        disabled={bookedServiceId === s.id}
+                        style={{
+                          display: 'inline-block',
+                          width: '100%',
+                          padding: '10px 0',
+                          backgroundColor: bookedServiceId === s.id ? '#10b981' : '#a2783a',
+                          color: 'white',
+                          textAlign: 'center',
+                          borderRadius: '8px',
+                          textDecoration: 'none',
+                          fontWeight: '500',
+                          transition: 'background-color 0.3s',
+                          border: 'none',
+                          cursor: bookedServiceId === s.id ? 'default' : 'pointer',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (bookedServiceId !== s.id) {
+                            e.target.style.backgroundColor = '#8b6a30';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (bookedServiceId !== s.id) {
+                            e.target.style.backgroundColor = '#a2783a';
+                          }
+                        }}
+                      >
+                        {bookedServiceId === s.id ? 'Booked ✓' : 'Book Now'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  color: '#6b7280'
+                }}>
+                  <FaSadTear style={{
+                    fontSize: '64px',
+                    color: '#a2783a',
+                    marginBottom: '20px'
+                  }} />
+                  <h3 style={{
+                    fontSize: '24px',
+                    fontWeight: '500',
+                    marginBottom: '10px',
+                    color: '#a2783a'
+                  }}>
+                    No services found
+                  </h3>
+                  <p style={{ fontSize: '16px', marginBottom: '20px' }}>
+                    No services match your current filters
+                  </p>
+                  <button
+                    onClick={clearAllFilters}
+                    style={{
+                      marginTop: '10px',
+                      padding: '12px 28px',
+                      backgroundColor: '#a2783a',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      transition: 'background-color 0.3s',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#8b6a30'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#a2783a'}
+                  >
+                    <FaTimes /> Clear All Filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-gray-900 text-white">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <h3 className="text-2xl md:text-3xl font-semibold">
+            Plan Your Event With Us
+          </h3>
+          <p className="text-white/90 max-w-2xl mx-auto mt-2">
+            Partner with EventHub for seamless planning, trusted vendors, and
+            memorable experiences.
+          </p>
+          <Link
+            to="/contact"
+            className="inline-block mt-4 px-6 py-3 rounded-lg bg-white text-gray-900 font-medium hover:bg-gray-100 transition"
+          >
+            Get Started
+          </Link>
+        </div>
+      </section>
+
+      {/* Booking Modal */}
+      <BookingModal
+        service={selectedService}
+        isOpen={isBookingModalOpen}
+        onClose={() => {
+          setIsBookingModalOpen(false);
+          setSelectedService(null);
+        }}
+        onSuccess={handleBookingSuccess}
+      />
+    </>
+  );
+};
+
+export default Services;

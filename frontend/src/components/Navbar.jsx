@@ -1,32 +1,58 @@
-import React, { useState } from "react";
-import { Link } from "react-scroll";
-import { GiHamburgerMenu } from "react-icons/gi";
+import { Link } from "react-router-dom";
+import { BsCalendarEvent } from "react-icons/bs";
 
 const Navbar = () => {
-  const [show, setShow] = useState(false);
   return (
-    <nav>
-      <div className="logo">KING's</div>
-      <div className={show ? "navLinks showmenu" : "navLinks"}>
-        <div className="links">
-          <Link to="hero" spy={true} smooth={true} duration={500}>
-            HOME
-          </Link>
-          <Link to="services" spy={true} smooth={true} duration={500}>
-            SERVICES
-          </Link>
-          <Link to="about" spy={true} smooth={true} duration={500}>
-            ABOUT
-          </Link>
-          <Link to="contact" spy={true} smooth={true} duration={500}>
-            CONTACT
-          </Link>
+    <header className="sticky top-0 z-50 bg-white shadow-md">
+
+      <div role="navigation" className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+
+        {/* Logo */}
+        <Link to="/home" className="flex items-center gap-3 group">
+          <BsCalendarEvent className="text-3xl text-blue-600" />
+          <div className="flex items-baseline">
+            <span className="text-5xl font-extrabold italic tracking-tight text-blue-600 drop-shadow-sm">Event</span>
+            <span className="text-5xl font-extrabold italic tracking-tight text-purple-600 drop-shadow-sm">Hub</span>
+          </div>
+        </Link>
+
+        {/* Menu */}
+        <div className="flex items-center flex-wrap gap-x-6 gap-y-2">
+
+          <Link className="text-gray-700 hover:text-blue-600 font-medium" to="/home">Home</Link>
+
+          <Link className="text-gray-700 hover:text-blue-600 font-medium" to="/services">Services</Link>
+
+          <Link className="text-gray-700 hover:text-blue-600 font-medium" to="/about">About</Link>
+
+          <Link className="text-gray-700 hover:text-blue-600 font-medium" to="/blogs">Blogs</Link>
+
+          <Link className="text-gray-700 hover:text-blue-600 font-medium" to="/faqs">FAQs</Link>
+
+          <Link className="text-gray-700 hover:text-blue-600 font-medium" to="/contact">Contact</Link>
+
+          {/* Auth Buttons */}
+          <div className="flex items-center gap-3 ml-4">
+            <Link 
+              className="px-5 py-2 border-2 border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition" 
+              to="/login"
+            >
+              Login
+            </Link>
+
+            <Link 
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition" 
+              to="/register"
+            >
+              Register
+            </Link>
+          </div>
+
         </div>
+
       </div>
-      <div className="hamburger" onClick={() => setShow(!show)}>
-        <GiHamburgerMenu />
-      </div>
-    </nav>
+
+    </header>
   );
 };
 
