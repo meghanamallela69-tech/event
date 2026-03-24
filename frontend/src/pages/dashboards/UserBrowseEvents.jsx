@@ -8,6 +8,7 @@ import { FiSearch, FiCalendar, FiMapPin } from "react-icons/fi";
 import { BsFilter, BsBookmarkHeart, BsBookmarkHeartFill } from "react-icons/bs";
 import toast from "react-hot-toast";
 import BookingModal from "../../components/BookingModal";
+import EventDetailsModal from "../../components/EventDetailsModal";
 
 const UserBrowseEvents = () => {
   const { token } = useAuth();
@@ -20,6 +21,7 @@ const UserBrowseEvents = () => {
   const [dateFilter, setDateFilter] = useState("all");
   const [savedEvents, setSavedEvents] = useState([]);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   const categories = ["all", "Conference", "Music", "Food", "Tech", "Wedding", "Party", "Outdoor"];
@@ -121,8 +123,9 @@ const UserBrowseEvents = () => {
     setFilteredEvents(filtered);
   };
 
-  const handleViewDetails = (eventId) => {
-    navigate(`/dashboard/user/events/${eventId}`);
+  const handleViewDetails = (event) => {
+    setSelectedEvent(event);
+    setDetailsModalOpen(true);
   };
 
   const handleBookNow = (event) => {
@@ -360,28 +363,36 @@ const UserBrowseEvents = () => {
                   <FiMapPin />
                   {event.location || "Location TBD"}
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   <button 
-                    onClick={() => handleViewDetails(event._id)}
+                    onClick={() => handleViewDetails(event)}
                     style={{
                       flex: 1,
-                      padding: '10px 0',
+                      padding: '14px 18px', // Increased padding
                       backgroundColor: 'white',
                       color: '#a2783a',
                       textAlign: 'center',
-                      borderRadius: '8px',
-                      fontWeight: '500',
+                      borderRadius: '10px', // Increased border radius
+                      fontWeight: '700', // Increased font weight
+                      fontSize: '15px', // Increased font size
                       transition: 'all 0.3s',
                       border: '2px solid #a2783a',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)', // Added shadow
+                      textTransform: 'uppercase', // Make text uppercase
+                      letterSpacing: '0.5px' // Add letter spacing
                     }}
                     onMouseEnter={(e) => {
                       e.target.style.backgroundColor = '#a2783a';
                       e.target.style.color = 'white';
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(162, 120, 58, 0.3)';
                     }}
                     onMouseLeave={(e) => {
                       e.target.style.backgroundColor = 'white';
                       e.target.style.color = '#a2783a';
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
                     }}
                   >
                     View Details
@@ -390,18 +401,32 @@ const UserBrowseEvents = () => {
                     onClick={() => handleBookNow(event)}
                     style={{
                       flex: 1,
-                      padding: '10px 0',
+                      padding: '14px 18px', // Increased padding
                       backgroundColor: '#a2783a',
                       color: 'white',
                       textAlign: 'center',
-                      borderRadius: '8px',
-                      fontWeight: '500',
-                      transition: 'background-color 0.3s',
-                      border: 'none',
-                      cursor: 'pointer'
+                      borderRadius: '10px', // Increased border radius
+                      fontWeight: '700', // Increased font weight
+                      fontSize: '15px', // Increased font size
+                      transition: 'all 0.3s',
+                      border: '2px solid #a2783a',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)', // Added shadow
+                      textTransform: 'uppercase', // Make text uppercase
+                      letterSpacing: '0.5px' // Add letter spacing
                     }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#8b6a30'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#a2783a'}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#8b6a30';
+                      e.target.style.borderColor = '#8b6a30';
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(162, 120, 58, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#a2783a';
+                      e.target.style.borderColor = '#a2783a';
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                    }}
                   >
                     Book Now
                   </button>
@@ -432,6 +457,22 @@ const UserBrowseEvents = () => {
             addons: selectedEvent.addons
           }}
           onBookingSuccess={handleBookingSuccess}
+        />
+      )}
+
+      {/* Event Details Modal */}
+      {detailsModalOpen && selectedEvent && (
+        <EventDetailsModal
+          isOpen={detailsModalOpen}
+          onClose={() => {
+            setDetailsModalOpen(false);
+            setSelectedEvent(null);
+          }}
+          event={selectedEvent}
+          onBookNow={(event) => {
+            setDetailsModalOpen(false);
+            handleBookNow(event);
+          }}
         />
       )}
     </UserLayout>

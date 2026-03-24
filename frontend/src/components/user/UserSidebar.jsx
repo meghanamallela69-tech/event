@@ -28,7 +28,7 @@ Item.propTypes = {
 
 const UserSidebar = ({ onLogout }) => {
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-white text-gray-800 flex flex-col shadow-xl z-50 border-r border-gray-200">
+    <aside className="fixed left-0 top-0 h-screen w-64 bg-white text-gray-800 flex flex-col shadow-xl z-40 border-r border-gray-200">
       <div className="px-4 py-4 text-lg font-semibold border-b border-gray-200 text-blue-600">
         User Dashboard
       </div>

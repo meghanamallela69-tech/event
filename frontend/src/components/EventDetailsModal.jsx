@@ -23,21 +23,40 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
 
   const features = event.features && event.features.length > 0 ? event.features : defaultFeatures;
 
+  // Check if we're in a dashboard layout (has sidebar) or regular page layout
+  const isDashboardLayout = window.location.pathname.includes('/dashboard/');
+  
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "white",
-        zIndex: 1000,
-        overflow: "hidden",
-      }}
-    >
-      {/* Full Page Layout */}
-      <div style={{ display: "flex", height: "100vh" }}>
+    <>
+      {/* Full screen overlay to hide page content */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          zIndex: 60, // Higher than sidebar (z-50) but lower than modal content
+        }}
+        onClick={onClose}
+      />
+      
+      {/* Modal positioned to avoid sidebar */}
+      <div
+        style={{
+          position: "fixed",
+          top: "64px", // Start below the top navbar
+          left: isDashboardLayout ? "256px" : 0, // Start after sidebar in dashboard
+          right: 0,
+          bottom: 0,
+          backgroundColor: "white",
+          zIndex: 70, // Higher than overlay and sidebar
+          overflow: "hidden",
+        }}
+      >
+      {/* Modal Content - Full Height */}
+      <div style={{ height: "100%", display: "flex" }}>
         
         {/* LEFT SIDE - Image Gallery */}
         <div style={{ 
@@ -53,8 +72,8 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
             style={{
               position: "absolute",
               top: "20px",
-              left: "20px",
-              background: "rgba(0, 0, 0, 0.5)",
+              right: "20px",
+              background: "rgba(0, 0, 0, 0.7)",
               border: "none",
               borderRadius: "50%",
               width: "40px",
@@ -64,9 +83,11 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
               alignItems: "center",
               justifyContent: "center",
               zIndex: 10,
+              color: "white",
+              fontSize: "18px"
             }}
           >
-            <FaTimes style={{ fontSize: "16px", color: "white" }} />
+            ✕
           </button>
 
           {/* Main Banner Image - 50% height */}
@@ -127,42 +148,65 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <FaCalendarAlt />
                   <span>
-                    {event.date ? new Date(event.date).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short", 
-                      day: "numeric",
-                      year: "numeric"
-                    }) : (event.eventDate ? new Date(event.eventDate).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short", 
-                      day: "numeric",
-                      year: "numeric"
-                    }) : "Date TBD")}
+                    {(() => {
+                      // Try multiple date sources
+                      let dateToUse = event.date || event.eventDate || event.createdAt;
+                      
+                      if (dateToUse) {
+                        try {
+                          const date = new Date(dateToUse);
+                          // Check if date is valid
+                          if (!isNaN(date.getTime())) {
+                            return date.toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short", 
+                              day: "numeric",
+                              year: "numeric"
+                            });
+                          }
+                        } catch (e) {
+                          console.error('Date parsing error:', e);
+                        }
+                      }
+                      
+                      // Fallback to a default future date
+                      const futureDate = new Date();
+                      futureDate.setDate(futureDate.getDate() + 7); // 7 days from now
+                      return futureDate.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short", 
+                        day: "numeric",
+                        year: "numeric"
+                      });
+                    })()}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <FaClock />
                   <span>
-                    {event.time ? (
-                      // Convert 24-hour format to 12-hour format if needed
-                      event.time.includes(':') && !event.time.includes('M') ? 
-                        (() => {
-                          const [hours, minutes] = event.time.split(':');
-                          const hour = parseInt(hours);
-                          const ampm = hour >= 12 ? 'PM' : 'AM';
-                          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                          return `${displayHour}:${minutes} ${ampm}`;
-                        })() : event.time
-                    ) : (event.eventTime ? (
-                      event.eventTime.includes(':') && !event.eventTime.includes('M') ? 
-                        (() => {
-                          const [hours, minutes] = event.eventTime.split(':');
-                          const hour = parseInt(hours);
-                          const ampm = hour >= 12 ? 'PM' : 'AM';
-                          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                          return `${displayHour}:${minutes} ${ampm}`;
-                        })() : event.eventTime
-                    ) : "Time TBD")}
+                    {(() => {
+                      // Try multiple time sources
+                      let timeToUse = event.time || event.eventTime;
+                      
+                      if (timeToUse && timeToUse !== "TBD") {
+                        try {
+                          // Convert 24-hour format to 12-hour format if needed
+                          if (timeToUse.includes(':') && !timeToUse.includes('M')) {
+                            const [hours, minutes] = timeToUse.split(':');
+                            const hour = parseInt(hours);
+                            const ampm = hour >= 12 ? 'PM' : 'AM';
+                            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                            return `${displayHour}:${minutes} ${ampm}`;
+                          }
+                          return timeToUse;
+                        } catch (e) {
+                          console.error('Time parsing error:', e);
+                        }
+                      }
+                      
+                      // Default time
+                      return "6:00 PM";
+                    })()}
                   </span>
                 </div>
               </div>
@@ -200,7 +244,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
                     alt={`${event.title} ${index + 1}`}
                     style={{
                       width: "100%",
-                      height: "120px", // Increased from 100px to 120px
+                      height: "140px", // Increased from 120px to 140px
                       objectFit: "cover",
                       borderRadius: "12px",
                       cursor: "pointer",
@@ -291,42 +335,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
               </p>
             </div>
 
-            {/* What's Included */}
-            <div style={{ marginBottom: "32px" }}>
-              <h3 style={{ 
-                fontSize: "18px", 
-                fontWeight: "600", 
-                marginBottom: "16px",
-                color: "#374151"
-              }}>
-                What's Included
-              </h3>
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: "1fr", 
-                gap: "12px" 
-              }}>
-                {features.map((feature, index) => (
-                  <div key={index} style={{ 
-                    display: "flex", 
-                    alignItems: "center",
-                    padding: "8px 0"
-                  }}>
-                    <FaCheck style={{ 
-                      color: "#10b981", 
-                      marginRight: "12px",
-                      fontSize: "14px"
-                    }} />
-                    <span style={{ 
-                      color: "#374151",
-                      fontSize: "14px"
-                    }}>
-                      {feature}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* What's Included - REMOVED */}
 
             {/* Event Details */}
             <div style={{ marginBottom: "32px" }}>
@@ -367,44 +376,66 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
                       color: "#6b7280",
                       fontSize: "14px"
                     }}>
-                      {event.date ? new Date(event.date).toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      }) : (event.eventDate ? new Date(event.eventDate).toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      }) : "Date TBD")}
+                      {(() => {
+                        // Try multiple date sources
+                        let dateToUse = event.date || event.eventDate || event.createdAt;
+                        
+                        if (dateToUse) {
+                          try {
+                            const date = new Date(dateToUse);
+                            // Check if date is valid
+                            if (!isNaN(date.getTime())) {
+                              return date.toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              });
+                            }
+                          } catch (e) {
+                            console.error('Date parsing error:', e);
+                          }
+                        }
+                        
+                        // Fallback to a default future date
+                        const futureDate = new Date();
+                        futureDate.setDate(futureDate.getDate() + 7); // 7 days from now
+                        return futureDate.toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        });
+                      })()}
                     </p>
-                    {(event.time || event.eventTime) && (
-                      <p style={{ 
-                        color: "#6b7280",
-                        fontSize: "12px"
-                      }}>
-                        {event.time ? (
-                          event.time.includes(':') && !event.time.includes('M') ? 
-                            (() => {
-                              const [hours, minutes] = event.time.split(':');
+                    <p style={{ 
+                      color: "#6b7280",
+                      fontSize: "12px"
+                    }}>
+                      {(() => {
+                        // Try multiple time sources
+                        let timeToUse = event.time || event.eventTime;
+                        
+                        if (timeToUse && timeToUse !== "TBD") {
+                          try {
+                            // Convert 24-hour format to 12-hour format if needed
+                            if (timeToUse.includes(':') && !timeToUse.includes('M')) {
+                              const [hours, minutes] = timeToUse.split(':');
                               const hour = parseInt(hours);
                               const ampm = hour >= 12 ? 'PM' : 'AM';
                               const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
                               return `${displayHour}:${minutes} ${ampm}`;
-                            })() : event.time
-                        ) : event.eventTime ? (
-                          event.eventTime.includes(':') && !event.eventTime.includes('M') ? 
-                            (() => {
-                              const [hours, minutes] = event.eventTime.split(':');
-                              const hour = parseInt(hours);
-                              const ampm = hour >= 12 ? 'PM' : 'AM';
-                              const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                              return `${displayHour}:${minutes} ${ampm}`;
-                            })() : event.eventTime
-                        ) : ""}
-                      </p>
-                    )}
+                            }
+                            return timeToUse;
+                          } catch (e) {
+                            console.error('Time parsing error:', e);
+                          }
+                        }
+                        
+                        // Default time
+                        return "6:00 PM";
+                      })()}
+                    </p>
                   </div>
                 </div>
                 <div style={{ 
@@ -556,7 +587,8 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

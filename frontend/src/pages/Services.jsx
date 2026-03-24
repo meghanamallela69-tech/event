@@ -21,6 +21,7 @@ import { toast } from "react-hot-toast";
 import axios from "axios";
 import useAuth from "../context/useAuth";
 import BookingModal from "../components/BookingModal";
+import EventDetailsModal from "../components/EventDetailsModal";
 import { API_BASE } from "../lib/http";
 
 const Services = () => {
@@ -35,6 +36,7 @@ const Services = () => {
   const [selectedRating, setSelectedRating] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [bookedServiceId, setBookedServiceId] = useState(null);
 
@@ -125,6 +127,12 @@ const Services = () => {
     // User is logged in - open booking modal
     setSelectedService(service);
     setIsBookingModalOpen(true);
+  };
+
+  // Handle view details button click
+  const handleViewDetailsClick = (service) => {
+    setSelectedService(service);
+    setIsDetailsModalOpen(true);
   };
 
   // Handle successful booking
@@ -537,11 +545,39 @@ const Services = () => {
                               transition: 'background-color 0.3s',
                               border: 'none',
                               cursor: isBooked ? 'default' : 'pointer',
+                              marginBottom: '8px',
                             }}
                             onMouseEnter={(e) => { if (!isBooked) e.target.style.backgroundColor = '#8b6a30'; }}
                             onMouseLeave={(e) => { if (!isBooked) e.target.style.backgroundColor = '#a2783a'; }}
                           >
                             {isBooked ? 'Booked ✓' : 'Book Now'}
+                          </button>
+                          <button
+                            onClick={() => handleViewDetailsClick(s)}
+                            style={{
+                              display: 'inline-block',
+                              width: '100%',
+                              padding: '10px 0',
+                              backgroundColor: 'white',
+                              color: '#a2783a',
+                              textAlign: 'center',
+                              borderRadius: '8px',
+                              textDecoration: 'none',
+                              fontWeight: '500',
+                              transition: 'all 0.3s',
+                              border: '2px solid #a2783a',
+                              cursor: 'pointer',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = '#a2783a';
+                              e.target.style.color = 'white';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'white';
+                              e.target.style.color = '#a2783a';
+                            }}
+                          >
+                            View Details
                           </button>
                         </div>
                       </div>
@@ -622,6 +658,20 @@ const Services = () => {
           setSelectedService(null);
         }}
         onSuccess={handleBookingSuccess}
+      />
+
+      {/* Event Details Modal */}
+      <EventDetailsModal
+        event={selectedService}
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedService(null);
+        }}
+        onBookNow={(event) => {
+          setIsDetailsModalOpen(false);
+          handleBookClick(event);
+        }}
       />
     </>
   );

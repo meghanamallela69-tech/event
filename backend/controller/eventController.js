@@ -7,12 +7,32 @@ export const listEvents = async (req, res) => {
       .select('title description price category date time location eventType addons ticketTypes availableTickets totalTickets images createdBy status')
       .sort({ date: 1 });
     
+    // Enhance events with default dates/times if missing
+    const enhancedEvents = events.map(event => {
+      const eventObj = event.toObject();
+      
+      // If no date, set a default future date
+      if (!eventObj.date) {
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 7); // 7 days from now
+        eventObj.date = futureDate;
+      }
+      
+      // If no time, set a default time
+      if (!eventObj.time || eventObj.time === "") {
+        eventObj.time = "18:00"; // 6:00 PM
+      }
+      
+      return eventObj;
+    });
+    
     // Debug: Log first event to check addons
-    if (events.length > 0) {
-      console.log('First event addons:', events[0].addons);
+    if (enhancedEvents.length > 0) {
+      console.log('First event addons:', enhancedEvents[0].addons);
+      console.log('First event date/time:', enhancedEvents[0].date, enhancedEvents[0].time);
     }
     
-    return res.status(200).json({ success: true, events });
+    return res.status(200).json({ success: true, events: enhancedEvents });
   } catch (error) {
     console.error('Error fetching events:', error);
     return res.status(500).json({ success: false, message: "Unknown Error" });

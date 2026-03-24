@@ -336,21 +336,40 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
     );
   }
 
+  // Check if we're in a dashboard layout (has sidebar) or regular page layout
+  const isDashboardLayout = window.location.pathname.includes('/dashboard/');
+  
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "white",
-        zIndex: 1000,
-        overflow: "hidden",
-      }}
-    >
-      {/* Full Page Layout */}
-      <div style={{ display: "flex", height: "100vh" }}>
+    <>
+      {/* Full screen overlay to hide page content */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          zIndex: 60, // Higher than sidebar (z-50) but lower than modal content
+        }}
+        onClick={onClose}
+      />
+      
+      {/* Modal positioned to avoid sidebar */}
+      <div
+        style={{
+          position: "fixed",
+          top: "64px", // Start below the top navbar
+          left: isDashboardLayout ? "256px" : 0, // Start after sidebar in dashboard
+          right: 0,
+          bottom: 0,
+          backgroundColor: "white",
+          zIndex: 70, // Higher than overlay and sidebar
+          overflow: "hidden",
+        }}
+      >
+      {/* Modal Content - Full Height */}
+      <div style={{ height: "100%", display: "flex" }}>
         
         {/* LEFT SIDE - Image Gallery */}
         <div style={{ 
@@ -366,8 +385,8 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
             style={{
               position: "absolute",
               top: "20px",
-              left: "20px",
-              background: "rgba(0, 0, 0, 0.5)",
+              right: "20px",
+              background: "rgba(0, 0, 0, 0.7)",
               border: "none",
               borderRadius: "50%",
               width: "40px",
@@ -377,9 +396,11 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
               alignItems: "center",
               justifyContent: "center",
               zIndex: 10,
+              color: "white",
+              fontSize: "18px"
             }}
           >
-            <FaTimes style={{ fontSize: "16px", color: "white" }} />
+            ✕
           </button>
 
           {/* Main Banner Image - Further reduced height */}
@@ -426,42 +447,65 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <FaCalendarAlt />
                   <span>
-                    {service.date ? new Date(service.date).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short", 
-                      day: "numeric",
-                      year: "numeric"
-                    }) : (service.eventDate ? new Date(service.eventDate).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short", 
-                      day: "numeric",
-                      year: "numeric"
-                    }) : "Date TBD")}
+                    {(() => {
+                      // Try multiple date sources
+                      let dateToUse = service.date || service.eventDate || service.createdAt;
+                      
+                      if (dateToUse) {
+                        try {
+                          const date = new Date(dateToUse);
+                          // Check if date is valid
+                          if (!isNaN(date.getTime())) {
+                            return date.toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short", 
+                              day: "numeric",
+                              year: "numeric"
+                            });
+                          }
+                        } catch (e) {
+                          console.error('Date parsing error:', e);
+                        }
+                      }
+                      
+                      // Fallback to a default future date
+                      const futureDate = new Date();
+                      futureDate.setDate(futureDate.getDate() + 7); // 7 days from now
+                      return futureDate.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short", 
+                        day: "numeric",
+                        year: "numeric"
+                      });
+                    })()}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <FaClock />
                   <span>
-                    {service.time ? (
-                      // Convert 24-hour format to 12-hour format if needed
-                      service.time.includes(':') && !service.time.includes('M') ? 
-                        (() => {
-                          const [hours, minutes] = service.time.split(':');
-                          const hour = parseInt(hours);
-                          const ampm = hour >= 12 ? 'PM' : 'AM';
-                          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                          return `${displayHour}:${minutes} ${ampm}`;
-                        })() : service.time
-                    ) : (service.eventTime ? (
-                      service.eventTime.includes(':') && !service.eventTime.includes('M') ? 
-                        (() => {
-                          const [hours, minutes] = service.eventTime.split(':');
-                          const hour = parseInt(hours);
-                          const ampm = hour >= 12 ? 'PM' : 'AM';
-                          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                          return `${displayHour}:${minutes} ${ampm}`;
-                        })() : service.eventTime
-                    ) : "Time TBD")}
+                    {(() => {
+                      // Try multiple time sources
+                      let timeToUse = service.time || service.eventTime;
+                      
+                      if (timeToUse && timeToUse !== "TBD") {
+                        try {
+                          // Convert 24-hour format to 12-hour format if needed
+                          if (timeToUse.includes(':') && !timeToUse.includes('M')) {
+                            const [hours, minutes] = timeToUse.split(':');
+                            const hour = parseInt(hours);
+                            const ampm = hour >= 12 ? 'PM' : 'AM';
+                            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                            return `${displayHour}:${minutes} ${ampm}`;
+                          }
+                          return timeToUse;
+                        } catch (e) {
+                          console.error('Time parsing error:', e);
+                        }
+                      }
+                      
+                      // Default time
+                      return "6:00 PM";
+                    })()}
                   </span>
                 </div>
               </div>
@@ -499,7 +543,7 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
                     alt={`${service.title} ${index + 1}`}
                     style={{
                       width: "100%",
-                      height: "120px", // Increased from 100px to 120px for larger thumbnails
+                      height: "140px", // Increased from 120px to 140px for even larger thumbnails
                       objectFit: "cover",
                       borderRadius: "12px", // Increased border radius
                       cursor: "pointer",
@@ -572,7 +616,7 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
             padding: "32px"
           }}>
             <form onSubmit={isTicketed ? handleTicketedSubmit : handleFullServiceSubmit}>
-          {isTicketed ? (
+              {isTicketed ? (
             <>
               {/* TICKETED EVENT FORM */}
               
@@ -1184,12 +1228,13 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
                 </button>
               </div>
             </>
-          )}
+              )}
             </form>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
