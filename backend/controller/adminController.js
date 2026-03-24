@@ -1,6 +1,8 @@
 import { User } from "../models/userSchema.js";
 import { Event } from "../models/eventSchema.js";
 import { Registration } from "../models/registrationSchema.js";
+import { Booking } from "../models/bookingSchema.js";
+import { Payment } from "../models/paymentSchema.js";
 import bcrypt from "bcrypt";
 import { sendMail } from "../util/mailer.js";
 
@@ -110,5 +112,82 @@ export const listRegistrationsAdmin = async (req, res) => {
     return res.status(200).json({ success: true, registrations: regs });
   } catch {
     return res.status(500).json({ success: false, message: "Unknown Error" });
+  }
+};
+
+export const getReports = async (req, res) => {
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalUsers,
+      totalMerchants,
+      totalEvents,
+      totalBookings,
+      activeEvents,
+      recentUsers,
+      recentEvents,
+      paidBookings,
+      pendingBookings,
+    ] = await Promise.all([
+      User.countDocuments({ role: "user" }),
+      User.countDocuments({ role: "merchant" }),
+      Event.countDocuments(),
+      Booking.countDocuments(),
+      Event.countDocuments({ date: { $gte: now } }),
+      User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+      Event.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+      Booking.countDocuments({ status: "confirmed" }),
+      Booking.countDocuments({ status: "pending" }),
+    ]);
+
+    // Revenue from payments
+    const revenueAgg = await Payment.aggregate([
+      { $match: { paymentStatus: "success" } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]);
+    const monthlyRevenueAgg = await Payment.aggregate([
+      { $match: { paymentStatus: "success", createdAt: { $gte: thirtyDaysAgo } } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]);
+
+    const totalRevenue = revenueAgg[0]?.total || 0;
+    const monthlyRevenue = monthlyRevenueAgg[0]?.total || 0;
+
+    return res.status(200).json({
+      success: true,
+      reports: {
+        totalUsers,
+        totalMerchants,
+        totalEvents,
+        totalBookings,
+        activeEvents,
+        recentUsers,
+        recentEvents,
+        paidBookings,
+        pendingBookings,
+        totalRevenue,
+        monthlyRevenue,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const getPublicStats = async (req, res) => {
+  try {
+    const [totalEvents, totalUsers, totalMerchants] = await Promise.all([
+      Event.countDocuments(),
+      User.countDocuments({ role: "user" }),
+      User.countDocuments({ role: "merchant" }),
+    ]);
+    return res.status(200).json({
+      success: true,
+      stats: { totalEvents, totalUsers, totalMerchants },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 };

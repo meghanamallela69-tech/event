@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Now Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Book Now Button Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Backend Connection Test</h2>
+        <button onclick="testBackendConnection()">Test Backend Connection</button>
+        <div id="backend-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Events API Test</h2>
+        <button onclick="testEventsAPI()">Test Events API</button>
+        <div id="events-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Book Now Test (Full Service)</h2>
+        <button onclick="testFullServiceBooking()">Test Full Service Booking</button>
+        <div id="fullservice-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Book Now Test (Ticketed)</h2>
+        <button onclick="testTicketedBooking()">Test Ticketed Booking</button>
+        <div id="ticketed-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>5. Frontend Integration Test</h2>
+        <p>Open browser console and navigate to: <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+        <p>Login with: user@test.com / User@123</p>
+        <p>Go to Browse Events and click Book Now button</p>
+        <p>Check console for debug messages starting with 🔍</p>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/v1';
+        // You'll need to get a valid token by logging in first
+        let authToken = null;
+        
+        // Helper function to log results
+        function logResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            element.innerHTML += `<div class="${className}">${message}</div>`;
+        }
+        
+        // Test 1: Backend Connection
+        async function testBackendConnection() {
+            const resultDiv = document.getElementById('backend-result');
+            resultDiv.innerHTML = '<div class="info">Testing backend connection...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'ok') {
+                    logResult('backend-result', '✅ Backend is running and healthy', 'success');
+                } else {
+                    logResult('backend-result', '❌ Backend health check failed', 'error');
+                }
+            } catch (error) {
+                logResult('backend-result', `❌ Backend connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Test 2: Events API
+        async function testEventsAPI() {
+            const resultDiv = document.getElementById('events-result');
+            resultDiv.innerHTML = '<div class="info">Testing events API...</div>';
+            
+            if (!authToken) {
+                logResult('events-result', '⚠️ No auth token. Please login first to get a token.', 'error');
+                logResult('events-result', 'You can get a token by logging into the app and checking localStorage.getItem("token")', 'info');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/events`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    logResult('events-result', `✅ Events API working. Found ${data.events.length} events`, 'success');
+                    
+                    // Show first few events
+                    const eventsPreview = data.events.slice(0, 3).map(event => 
+                        `${event.title} (Type: ${event.eventType || 'NOT SET'})`
+                    ).join(', ');
+                    
+                    logResult('events-result', `Events: ${eventsPreview}`, 'info');
+                    
+                    // Check for missing eventType
+                    const missingEventType = data.events.filter(e => !e.eventType);
+                    if (missingEventType.length > 0) {
+                        logResult('events-result', `❌ ${missingEventType.length} events missing eventType`, 'error');
+                    } else {
+                        logResult('events-result', '✅ All events have eventType set', 'success');
+                    }
+                } else {
+                    logResult('events-result', `❌ Events API failed: ${data.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                logResult('events-result', `❌ Events API error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Test 3: Full Service Booking
+        async function testFullServiceBooking() {
+            const resultDiv = document.getElementById('fullservice-result');
+            resultDiv.innerHTML = '<div class="info">Testing full service booking...</div>';
+            
+            if (!authToken) {
+                logResult('fullservice-result', '⚠️ No auth token. Please set authToken variable first.', 'error');
+                return;
+            }
+            
+            try {
+                // First get events to find a full-service event
+                const eventsResponse = await fetch(`${API_BASE}/events`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const eventsData = await eventsResponse.json();
+                
+                const fullServiceEvent = eventsData.events.find(e => e.eventType === 'full-service');
+                
+                if (!fullServiceEvent) {
+                    logResult('fullservice-result', '❌ No full-service events found', 'error');
+                    return;
+                }
+                
+                logResult('fullservice-result', `Found full-service event: ${fullServiceEvent.title}`, 'info');
+                
+                // Test booking
+                const bookingResponse = await fetch(`${API_BASE}/event-bookings/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        eventId: fullServiceEvent._id,
+                        serviceDate: '2026-04-20',
+                        guestCount: 2,
+                        notes: 'Debug test booking'
+                    })
+                });
+                
+                const bookingData = await bookingResponse.json();
+                
+                if (bookingResponse.ok && bookingData.success) {
+                    logResult('fullservice-result', '✅ Full service booking test successful', 'success');
+                    logResult('fullservice-result', `Booking ID: ${bookingData.booking._id}`, 'info');
+                } else {
+                    logResult('fullservice-result', `❌ Full service booking failed: ${bookingData.message}`, 'error');
+                }
+                
+            } catch (error) {
+                logResult('fullservice-result', `❌ Full service booking error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Test 4: Ticketed Booking
+        async function testTicketedBooking() {
+            const resultDiv = document.getElementById('ticketed-result');
+            resultDiv.innerHTML = '<div class="info">Testing ticketed booking...</div>';
+            
+            if (!authToken) {
+                logResult('ticketed-result', '⚠️ No auth token. Please set authToken variable first.', 'error');
+                return;
+            }
+            
+            try {
+                // First get events to find a ticketed event
+                const eventsResponse = await fetch(`${API_BASE}/events`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const eventsData = await eventsResponse.json();
+                
+                const ticketedEvent = eventsData.events.find(e => e.eventType === 'ticketed');
+                
+                if (!ticketedEvent) {
+                    logResult('ticketed-result', '❌ No ticketed events found', 'error');
+                    return;
+                }
+                
+                logResult('ticketed-result', `Found ticketed event: ${ticketedEvent.title}`, 'info');
+                
+                // Get ticket types
+                const ticketsResponse = await fetch(`${API_BASE}/event-bookings/event/${ticketedEvent._id}/tickets`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const ticketsData = await ticketsResponse.json();
+                
+                if (!ticketsResponse.ok || !ticketsData.success || !ticketsData.ticketTypes.length) {
+                    logResult('ticketed-result', '❌ No ticket types available', 'error');
+                    return;
+                }
+                
+                const ticketType = ticketsData.ticketTypes[0];
+                logResult('ticketed-result', `Found ticket type: ${ticketType.name} - ₹${ticketType.price}`, 'info');
+                
+                // Test booking
+                const bookingResponse = await fetch(`${API_BASE}/event-bookings/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        eventId: ticketedEvent._id,
+                        ticketType: ticketType.name,
+                        quantity: 1,
+                        paymentMethod: 'Card'
+                    })
+                });
+                
+                const bookingData = await bookingResponse.json();
+                
+                if (bookingResponse.ok && bookingData.success) {
+                    logResult('ticketed-result', '✅ Ticketed booking test successful', 'success');
+                    logResult('ticketed-result', `Booking ID: ${bookingData.booking._id}`, 'info');
+                } else {
+                    logResult('ticketed-result', `❌ Ticketed booking failed: ${bookingData.message}`, 'error');
+                }
+                
+            } catch (error) {
+                logResult('ticketed-result', `❌ Ticketed booking error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Helper to set auth token
+        function setAuthToken() {
+            const token = prompt('Enter your auth token (get from localStorage.getItem("token") after logging in):');
+            if (token) {
+                authToken = token;
+                alert('Auth token set! You can now run the API tests.');
+            }
+        }
+        
+        // Add button to set auth token
+        document.addEventListener('DOMContentLoaded', function() {
+            const button = document.createElement('button');
+            button.textContent = 'Set Auth Token';
+            button.onclick = setAuthToken;
+            button.style.position = 'fixed';
+            button.style.top = '10px';
+            button.style.right = '10px';
+            button.style.backgroundColor = '#007bff';
+            button.style.color = 'white';
+            button.style.border = 'none';
+            button.style.borderRadius = '5px';
+            document.body.appendChild(button);
+        });
+    </script>
+</body>
+</html>

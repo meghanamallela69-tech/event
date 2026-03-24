@@ -7,6 +7,7 @@ import { API_BASE, authHeaders } from "../../lib/http";
 import { FiSearch, FiCalendar, FiMapPin } from "react-icons/fi";
 import { BsFilter, BsBookmarkHeart, BsBookmarkHeartFill } from "react-icons/bs";
 import toast from "react-hot-toast";
+import BookingModal from "../../components/BookingModal";
 
 const UserBrowseEvents = () => {
   const { token } = useAuth();
@@ -18,6 +19,8 @@ const UserBrowseEvents = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
   const [savedEvents, setSavedEvents] = useState([]);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const categories = ["all", "Conference", "Music", "Food", "Tech", "Wedding", "Party", "Outdoor"];
 
@@ -120,6 +123,17 @@ const UserBrowseEvents = () => {
 
   const handleViewDetails = (eventId) => {
     navigate(`/dashboard/user/events/${eventId}`);
+  };
+
+  const handleBookNow = (event) => {
+    setSelectedEvent(event);
+    setBookingModalOpen(true);
+  };
+
+  const handleBookingSuccess = () => {
+    setBookingModalOpen(false);
+    setSelectedEvent(null);
+    toast.success("Booking successful!");
   };
 
   const formatDate = (dateString) => {
@@ -235,36 +249,25 @@ const UserBrowseEvents = () => {
                 height: '180px',
                 overflow: 'hidden'
               }}>
-                {/* Get image based on category or title keywords */}
+                {/* Show only merchant-uploaded images */}
                 {(() => {
-                  const getEventImage = (ev) => {
-                    if (ev?.image && ev.image.trim() !== "") return ev.image;
-                    const categoryImages = {
-                      "Wedding": "/wedding.jpg",
-                      "Party": "/party.jpg",
-                      "Music": "/party.jpg",
-                      "Conference": "/gamenight.jpg",
-                      "Food": "/restaurant.jpg",
-                      "Tech": "/gamenight.jpg",
-                      "Outdoor": "/camping.jpg",
-                      "Birthday": "/birthday.jpg",
-                      "Anniversary": "/anniversary.jpg"
-                    };
-                    if (ev?.category && categoryImages[ev.category]) return categoryImages[ev.category];
-                    const title = (ev?.title || "").toLowerCase();
-                    if (title.includes("wedding") || title.includes("marriage")) return "/wedding.jpg";
-                    if (title.includes("music") || title.includes("concert") || title.includes("band")) return "/party.jpg";
-                    if (title.includes("party") || title.includes("celebration")) return "/party.jpg";
-                    if (title.includes("birthday")) return "/birthday.jpg";
-                    if (title.includes("conference") || title.includes("meeting")) return "/gamenight.jpg";
-                    if (title.includes("food") || title.includes("dinner")) return "/restaurant.jpg";
-                    if (title.includes("outdoor") || title.includes("camping")) return "/camping.jpg";
-                    if (title.includes("anniversary")) return "/anniversary.jpg";
-                    return "/party.jpg";
+                  const getMerchantImage = (ev) => {
+                    // Priority: images[0].url -> image -> bannerImage
+                    if (ev?.images && ev.images.length > 0 && ev.images[0]?.url) {
+                      return ev.images[0].url;
+                    }
+                    if (ev?.image && ev.image.trim() !== "") {
+                      return ev.image;
+                    }
+                    if (ev?.bannerImage && ev.bannerImage.trim() !== "") {
+                      return ev.bannerImage;
+                    }
+                    return null;
                   };
-                  return (
+                  const imageUrl = getMerchantImage(event);
+                  return imageUrl ? (
                     <img 
-                      src={getEventImage(event)} 
+                      src={imageUrl} 
                       alt={event.title} 
                       style={{
                         width: '100%',
@@ -272,6 +275,18 @@ const UserBrowseEvents = () => {
                         objectFit: 'cover'
                       }}
                     />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: '#f3f4f6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9ca3af'
+                    }}>
+                      <span>No Image</span>
+                    </div>
                   );
                 })()}
                 <div style={{
@@ -345,31 +360,79 @@ const UserBrowseEvents = () => {
                   <FiMapPin />
                   {event.location || "Location TBD"}
                 </div>
-                <button 
-                  onClick={() => handleViewDetails(event._id)}
-                  style={{
-                    display: 'inline-block',
-                    width: '100%',
-                    padding: '10px 0',
-                    backgroundColor: '#a2783a',
-                    color: 'white',
-                    textAlign: 'center',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    fontWeight: '500',
-                    transition: 'background-color 0.3s',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#8b6a30'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#a2783a'}
-                >
-                  View Details
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => handleViewDetails(event._id)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 0',
+                      backgroundColor: 'white',
+                      color: '#a2783a',
+                      textAlign: 'center',
+                      borderRadius: '8px',
+                      fontWeight: '500',
+                      transition: 'all 0.3s',
+                      border: '2px solid #a2783a',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#a2783a';
+                      e.target.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'white';
+                      e.target.style.color = '#a2783a';
+                    }}
+                  >
+                    View Details
+                  </button>
+                  <button 
+                    onClick={() => handleBookNow(event)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 0',
+                      backgroundColor: '#a2783a',
+                      color: 'white',
+                      textAlign: 'center',
+                      borderRadius: '8px',
+                      fontWeight: '500',
+                      transition: 'background-color 0.3s',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#8b6a30'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#a2783a'}
+                  >
+                    Book Now
+                  </button>
+                </div>
               </div>
             </article>
           ))}
         </section>
+      )}
+
+      {/* Booking Modal */}
+      {bookingModalOpen && selectedEvent && (
+        <BookingModal
+          isOpen={bookingModalOpen}
+          onClose={() => {
+            setBookingModalOpen(false);
+            setSelectedEvent(null);
+          }}
+          service={{
+            _id: selectedEvent._id,
+            title: selectedEvent.title,
+            category: selectedEvent.category,
+            price: selectedEvent.price,
+            location: selectedEvent.location,
+            images: selectedEvent.images,
+            eventType: selectedEvent.eventType,
+            ticketTypes: selectedEvent.ticketTypes,
+            addons: selectedEvent.addons
+          }}
+          onBookingSuccess={handleBookingSuccess}
+        />
       )}
     </UserLayout>
   );

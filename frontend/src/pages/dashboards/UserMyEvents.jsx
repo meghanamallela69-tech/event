@@ -4,111 +4,239 @@ import { useNavigate } from "react-router-dom";
 import UserLayout from "../../components/user/UserLayout";
 import useAuth from "../../context/useAuth";
 import { API_BASE, authHeaders } from "../../lib/http";
-import { FiCalendar, FiMapPin, FiCheckCircle, FiClock, FiXCircle } from "react-icons/fi";
+import { FiCalendar, FiMapPin, FiCheckCircle, FiClock, FiXCircle, FiCreditCard, FiDownload, FiStar } from "react-icons/fi";
 import toast from "react-hot-toast";
+import PaymentModal from "../../components/PaymentModal";
+import TicketModal from "../../components/TicketModal";
+import RatingModal from "../../components/RatingModal";
 
 const UserMyEvents = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const [registrations, setRegistrations] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  
+  // Modal states
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   useEffect(() => {
-    fetchMyEvents();
+    fetchMyBookings();
   }, []);
 
-  const fetchMyEvents = async () => {
+  const fetchMyBookings = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/events/my-registrations`, {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE}/bookings/my-bookings`, {
         headers: authHeaders(token),
       });
       if (response.data.success) {
-        setRegistrations(response.data.registrations);
+        setBookings(response.data.bookings || []);
       }
     } catch (error) {
-      toast.error("Failed to load your events");
+      console.error("Fetch bookings error:", error);
+      toast.error("Failed to load your bookings");
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed":
-        return <FiCheckCircle className="text-green-600" />;
-      case "pending":
-        return <FiClock className="text-amber-600" />;
-      case "cancelled":
-        return <FiXCircle className="text-red-600" />;
-      default:
-        return <FiCheckCircle className="text-green-600" />;
+  const handleCancelBooking = async (bookingId) => {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    
+    try {
+      await axios.put(`${API_BASE}/bookings/${bookingId}/cancel`, {}, {
+        headers: authHeaders(token),
+      });
+      toast.success("Booking cancelled successfully");
+      fetchMyBookings();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to cancel booking");
     }
   };
 
-  const getStatusColor = (status) => {
+  const handlePayNow = (booking) => {
+    setSelectedBooking(booking);
+    setPaymentModalOpen(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setPaymentModalOpen(false);
+    fetchMyBookings();
+  };
+
+  const handleViewTicket = (booking) => {
+    setSelectedBooking(booking);
+    setTicketModalOpen(true);
+  };
+
+  const handleRateEvent = (booking) => {
+    setSelectedBooking(booking);
+    setRatingModalOpen(true);
+  };
+
+  const handleRatingSuccess = () => {
+    setRatingModalOpen(false);
+    fetchMyBookings();
+  };
+
+  const getStatusConfig = (status) => {
     switch (status?.toLowerCase()) {
       case "confirmed":
-        return "bg-green-100 text-green-700";
+      case "completed":
+        return { icon: <FiCheckCircle />, color: "bg-green-100 text-green-700", label: "Confirmed" };
       case "pending":
-        return "bg-amber-100 text-amber-700";
+        return { icon: <FiClock />, color: "bg-amber-100 text-amber-700", label: "Pending Approval" };
+      case "accepted":
+        return { icon: <FiCheckCircle />, color: "bg-blue-100 text-blue-700", label: "Accepted - Pay Now" };
+      case "paid":
+        return { icon: <FiCreditCard />, color: "bg-purple-100 text-purple-700", label: "Paid - Confirming" };
+      case "rejected":
+        return { icon: <FiXCircle />, color: "bg-red-100 text-red-700", label: "Rejected" };
       case "cancelled":
-        return "bg-red-100 text-red-700";
+        return { icon: <FiXCircle />, color: "bg-gray-100 text-gray-700", label: "Cancelled" };
       default:
-        return "bg-green-100 text-green-700";
+        return { icon: <FiClock />, color: "bg-amber-100 text-amber-700", label: status || "Pending" };
     }
+  };
+
+  const getActionButtons = (booking) => {
+    const status = booking.status?.toLowerCase();
+    const eventDate = new Date(booking.eventDate);
+    const isPast = eventDate < new Date();
+
+    const buttons = [];
+
+    // Pay Now button for accepted bookings
+    if (status === "accepted") {
+      buttons.push(
+        <button
+          key="pay"
+          onClick={() => handlePayNow(booking)}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium"
+        >
+          Pay Now
+        </button>
+      );
+    }
+
+    // View Ticket button for confirmed/completed bookings with ticket
+    if ((status === "confirmed" || status === "completed") && booking.ticket?.ticketNumber) {
+      buttons.push(
+        <button
+          key="ticket"
+          onClick={() => handleViewTicket(booking)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium flex items-center gap-2"
+        >
+          <FiDownload size={14} />
+          View Ticket
+        </button>
+      );
+    }
+
+    // Cancel button for pending/accepted bookings
+    if (["pending", "accepted"].includes(status)) {
+      buttons.push(
+        <button
+          key="cancel"
+          onClick={() => handleCancelBooking(booking._id)}
+          className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm font-medium"
+        >
+          Cancel
+        </button>
+      );
+    }
+
+    // Rate button for completed bookings without rating
+    if (status === "completed" && !booking.rating?.score && isPast) {
+      buttons.push(
+        <button
+          key="rate"
+          onClick={() => handleRateEvent(booking)}
+          className="px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition text-sm font-medium flex items-center gap-2"
+        >
+          <FiStar size={14} />
+          Rate Event
+        </button>
+      );
+    }
+
+    return buttons;
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return "Date TBD";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    if (!dateString || dateString === "TBD") return "Date TBD";
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Date TBD";
+      
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch (error) {
+      console.error("Date formatting error:", error);
+      return "Date TBD";
+    }
   };
 
-  const filteredRegistrations = registrations.filter((reg) => {
+  const formatTime = (timeString) => {
+    if (!timeString || timeString === "TBD" || timeString === "") return "Time TBD";
+    return timeString;
+  };
+
+  const formatPrice = (price) => {
+    if (!price || price === 0) return "Free";
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(price);
+  };
+
+  const filteredBookings = bookings.filter((booking) => {
     if (activeTab === "all") return true;
     if (activeTab === "upcoming") {
-      const eventDate = new Date(reg.event?.date);
-      return eventDate >= new Date();
+      const eventDate = new Date(booking.eventDate);
+      return eventDate >= new Date() && !["cancelled", "rejected"].includes(booking.status);
     }
     if (activeTab === "past") {
-      const eventDate = new Date(reg.event?.date);
+      const eventDate = new Date(booking.eventDate);
       return eventDate < new Date();
     }
     return true;
   });
 
-  const handleViewDetails = (eventId) => {
-    navigate(`/dashboard/user/events/${eventId}`);
-  };
-
   return (
     <UserLayout>
       <section className="mb-6">
-        <h2 className="text-2xl md:text-3xl font-semibold">My Events</h2>
-        <p className="text-gray-600 mt-1">Manage your event registrations and bookings</p>
+        <h2 className="text-2xl md:text-3xl font-semibold">My Bookings</h2>
+        <p className="text-gray-600 mt-1">Manage your event bookings and tickets</p>
       </section>
 
       {/* Stats Summary */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <p className="text-gray-500 text-sm">Total Bookings</p>
-          <p className="text-2xl font-bold text-gray-900">{registrations.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{bookings.length}</p>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-gray-500 text-sm">Upcoming Events</p>
-          <p className="text-2xl font-bold text-blue-600">
-            {registrations.filter((r) => new Date(r.event?.date) >= new Date()).length}
+          <p className="text-gray-500 text-sm">Pending</p>
+          <p className="text-2xl font-bold text-amber-600">
+            {bookings.filter((b) => ["pending", "accepted"].includes(b.status)).length}
           </p>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-gray-500 text-sm">Past Events</p>
-          <p className="text-2xl font-bold text-gray-600">
-            {registrations.filter((r) => new Date(r.event?.date) < new Date()).length}
+          <p className="text-gray-500 text-sm">Confirmed</p>
+          <p className="text-2xl font-bold text-green-600">
+            {bookings.filter((b) => ["confirmed", "completed"].includes(b.status)).length}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-gray-500 text-sm">To Rate</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {bookings.filter((b) => b.status === "completed" && !b.rating?.score).length}
           </p>
         </div>
       </section>
@@ -132,15 +260,15 @@ const UserMyEvents = () => {
         </div>
       </section>
 
-      {/* Events List */}
+      {/* Bookings List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
-      ) : filteredRegistrations.length === 0 ? (
+      ) : filteredBookings.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl">
-          <p className="text-gray-500 text-lg">No events found</p>
-          <p className="text-gray-400 mt-2">You haven't registered for any events yet</p>
+          <p className="text-gray-500 text-lg">No bookings found</p>
+          <p className="text-gray-400 mt-2">You haven't booked any events yet</p>
           <button
             onClick={() => navigate("/dashboard/user/browse")}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -150,89 +278,116 @@ const UserMyEvents = () => {
         </div>
       ) : (
         <section className="space-y-4">
-          {filteredRegistrations.map((reg) => (
-            <article
-              key={reg._id}
-              className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition"
-            >
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Event Image */}
-                <div className="w-full md:w-48 h-32 rounded-lg overflow-hidden flex-shrink-0">
-                  <img
-                    src={(() => {
-                      const ev = reg.event;
-                      if (ev?.image && ev.image.trim() !== "") return ev.image;
-                      const categoryImages = {
-                        "Wedding": "/wedding.jpg",
-                        "Party": "/party.jpg",
-                        "Music": "/party.jpg",
-                        "Conference": "/gamenight.jpg",
-                        "Food": "/restaurant.jpg",
-                        "Tech": "/gamenight.jpg",
-                        "Outdoor": "/camping.jpg",
-                        "Birthday": "/birthday.jpg",
-                        "Anniversary": "/anniversary.jpg"
-                      };
-                      if (ev?.category && categoryImages[ev.category]) return categoryImages[ev.category];
-                      const title = (ev?.title || "").toLowerCase();
-                      if (title.includes("wedding") || title.includes("marriage")) return "/wedding.jpg";
-                      if (title.includes("music") || title.includes("concert") || title.includes("band")) return "/party.jpg";
-                      if (title.includes("party") || title.includes("celebration")) return "/party.jpg";
-                      if (title.includes("birthday")) return "/birthday.jpg";
-                      if (title.includes("conference") || title.includes("meeting")) return "/gamenight.jpg";
-                      if (title.includes("food") || title.includes("dinner")) return "/restaurant.jpg";
-                      if (title.includes("outdoor") || title.includes("camping")) return "/camping.jpg";
-                      if (title.includes("anniversary")) return "/anniversary.jpg";
-                      return "/party.jpg";
-                    })()}
-                    alt={reg.event?.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* Event Details */}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {reg.event?.title}
-                    </h3>
-                    <span
-                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                        reg.status
-                      )}`}
-                    >
-                      {getStatusIcon(reg.status)}
-                      {reg.status || "Confirmed"}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <FiCalendar className="text-gray-400" />
-                      <span className="text-sm">{formatDate(reg.event?.date)}</span>
+          {filteredBookings.map((booking) => {
+            const statusConfig = getStatusConfig(booking.status);
+            const actionButtons = getActionButtons(booking);
+            
+            return (
+              <article
+                key={booking._id}
+                className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition"
+              >
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Event Info */}
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {booking.serviceTitle}
+                        </h3>
+                        <p className="text-sm text-gray-500">{booking.serviceCategory}</p>
+                      </div>
+                      <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${statusConfig.color}`}>
+                        {statusConfig.icon}
+                        {statusConfig.label}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <FiMapPin className="text-gray-400" />
-                      <span className="text-sm">{reg.event?.location || "Location TBD"}</span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
-                      Registered on {formatDate(reg.createdAt)}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <FiCalendar className="text-gray-400" />
+                        <span className="text-sm">{formatDate(booking.eventDate)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <FiClock className="text-gray-400" />
+                        <span className="text-sm">{formatTime(booking.eventTime)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <FiMapPin className="text-gray-400" />
+                        <span className="text-sm">{booking.location || "Location TBD"}</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleViewDetails(reg.event?._id)}
-                      className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition text-sm"
-                    >
-                      View Details
-                    </button>
+
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <span className="text-sm font-medium">{formatPrice(booking.totalPrice)}</span>
+                        {booking.ticket?.ticketType && (
+                          <span className="text-xs text-gray-400">({booking.ticket.ticketType})</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Show merchant response message if rejected */}
+                    {booking.status === "rejected" && booking.merchantResponse?.message && (
+                      <div className="mb-4 p-3 bg-red-50 rounded-lg text-sm text-red-700">
+                        <strong>Merchant message:</strong> {booking.merchantResponse.message}
+                      </div>
+                    )}
+
+                    {/* Show rating if exists */}
+                    {booking.rating?.score && (
+                      <div className="mb-4 flex items-center gap-2">
+                        <span className="text-amber-500">{"⭐".repeat(booking.rating.score)}</span>
+                        <span className="text-sm text-gray-600">{booking.rating.review}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-500">
+                        Booked on {formatDate(booking.createdAt)}
+                        {booking.ticket?.ticketNumber && (
+                          <span className="ml-2 text-blue-600">• Ticket: {booking.ticket.ticketNumber}</span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {actionButtons}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
+      )}
+
+      {/* Payment Modal */}
+      {paymentModalOpen && selectedBooking && (
+        <PaymentModal
+          booking={selectedBooking}
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {/* Ticket Modal */}
+      {ticketModalOpen && selectedBooking && (
+        <TicketModal
+          booking={selectedBooking}
+          isOpen={ticketModalOpen}
+          onClose={() => setTicketModalOpen(false)}
+        />
+      )}
+
+      {/* Rating Modal */}
+      {ratingModalOpen && selectedBooking && (
+        <RatingModal
+          booking={selectedBooking}
+          isOpen={ratingModalOpen}
+          onClose={() => setRatingModalOpen(false)}
+          onSuccess={handleRatingSuccess}
+        />
       )}
     </UserLayout>
   );

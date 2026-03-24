@@ -1,0 +1,23 @@
+@echo off
+echo Starting Event Management System...
+echo.
+
+echo Starting Backend Server (Port 5000)...
+start "Backend Server" cmd /k "cd backend && node app.js"
+
+echo Waiting 3 seconds for backend to start...
+timeout /t 3 /nobreak >nul
+
+echo Killing any process using port 5173...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173') do taskkill /PID %%a /F 2>nul
+
+echo Starting Frontend Server (Port 5173)...
+start "Frontend Server" cmd /k "cd frontend && vite --config vite.config.simple.js"
+
+echo.
+echo Both servers are starting...
+echo Backend: http://localhost:5000
+echo Frontend: http://localhost:5173
+echo.
+echo Press any key to close this window...
+pause >nul

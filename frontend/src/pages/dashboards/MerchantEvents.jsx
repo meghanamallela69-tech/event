@@ -116,7 +116,7 @@ const MerchantEvents = () => {
                 <div className="p-3 space-y-2">
                   <div className="flex items-center justify-between pt-2 border-t">
                     <span className="text-sm font-semibold text-blue-600">
-                      {ev.price ? `$${ev.price}` : "Free"}
+                      {ev.price ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(ev.price) : "Free"}
                     </span>
                     <span className="text-xs text-gray-500">
                       {ev.features?.length || 0} features

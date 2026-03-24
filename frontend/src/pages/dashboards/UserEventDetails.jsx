@@ -8,6 +8,7 @@ import { FiCalendar, FiMapPin, FiUser, FiArrowLeft } from "react-icons/fi";
 import { BsBookmark, BsBookmarkFill } from "react-icons/bs";
 import toast from "react-hot-toast";
 import ImageSlider from "../../components/ImageSlider";
+import BookingModal from "../../components/BookingModal";
 
 const UserEventDetails = () => {
   const { eventId } = useParams();
@@ -18,6 +19,8 @@ const UserEventDetails = () => {
   const [booking, setBooking] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [userBookingId, setUserBookingId] = useState(null);
 
   useEffect(() => {
     fetchEventDetails();
@@ -47,40 +50,56 @@ const UserEventDetails = () => {
 
   const checkRegistration = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/events/my-registrations`, {
+      const response = await axios.get(`${API_BASE}/events/me`, {
         headers: authHeaders(token),
       });
       if (response.data.success) {
-        const registered = response.data.registrations.some(
-          (reg) => reg.event?._id === eventId
+        const userRegistrations = response.data.registrations || response.data.bookings || [];
+        const userBooking = userRegistrations.find(
+          (reg) => reg.event?._id === eventId || reg.eventId === eventId
         );
-        setIsRegistered(registered);
+        setIsRegistered(!!userBooking);
+        setUserBookingId(userBooking?._id || null);
       }
     } catch (error) {
       console.error("Failed to check registration");
     }
   };
 
-  const handleBookEvent = async () => {
+  const handleBookEvent = () => {
     if (isRegistered) {
       toast.info("You are already registered for this event");
+      return;
+    }
+    setBookingModalOpen(true);
+  };
+
+  const handleBookingSuccess = () => {
+    setBookingModalOpen(false);
+    setIsRegistered(true);
+    toast.success("Successfully registered for the event!");
+  };
+
+  const handleCancelBooking = async () => {
+    if (!userBookingId) {
+      toast.error("Booking not found");
+      return;
+    }
+    
+    if (!window.confirm("Are you sure you want to cancel this booking?")) {
       return;
     }
 
     setBooking(true);
     try {
-      const response = await axios.post(
-        `${API_BASE}/events/${eventId}/register`,
-        {},
-        { headers: authHeaders(token) }
-      );
-      if (response.data.success) {
-        toast.success("Successfully registered for the event!");
-        setIsRegistered(true);
-      }
+      await axios.delete(`${API_BASE}/bookings/${userBookingId}`, {
+        headers: authHeaders(token)
+      });
+      toast.success("Booking cancelled successfully");
+      setIsRegistered(false);
+      setUserBookingId(null);
     } catch (error) {
-      const msg = error?.response?.data?.message || "Failed to register for event";
-      toast.error(msg);
+      toast.error(error.response?.data?.message || "Failed to cancel booking");
     } finally {
       setBooking(false);
     }
@@ -153,35 +172,22 @@ const UserEventDetails = () => {
         <div className="relative h-64 md:h-80">
           {event.images && event.images.length > 0 ? (
             <ImageSlider images={event.images} />
-          ) : (
+          ) : event.image ? (
             <img
-              src={(() => {
-                const categoryImages = {
-                  "Wedding": "/wedding.jpg",
-                  "Party": "/party.jpg",
-                  "Music": "/party.jpg",
-                  "Conference": "/gamenight.jpg",
-                  "Food": "/restaurant.jpg",
-                  "Tech": "/gamenight.jpg",
-                  "Outdoor": "/camping.jpg",
-                  "Birthday": "/birthday.jpg",
-                  "Anniversary": "/anniversary.jpg"
-                };
-                if (event.category && categoryImages[event.category]) return categoryImages[event.category];
-                const title = (event.title || "").toLowerCase();
-                if (title.includes("wedding") || title.includes("marriage")) return "/wedding.jpg";
-                if (title.includes("music") || title.includes("concert") || title.includes("band")) return "/party.jpg";
-                if (title.includes("party") || title.includes("celebration")) return "/party.jpg";
-                if (title.includes("birthday")) return "/birthday.jpg";
-                if (title.includes("conference") || title.includes("meeting")) return "/gamenight.jpg";
-                if (title.includes("food") || title.includes("dinner")) return "/restaurant.jpg";
-                if (title.includes("outdoor") || title.includes("camping")) return "/camping.jpg";
-                if (title.includes("anniversary")) return "/anniversary.jpg";
-                return "/party.jpg";
-              })()}
+              src={event.image}
               alt={event.title}
               className="w-full h-full object-cover"
             />
+          ) : event.bannerImage ? (
+            <img
+              src={event.bannerImage}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-500">No Image</span>
+            </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
           <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
@@ -297,7 +303,9 @@ const UserEventDetails = () => {
               {event.price > 0 ? (
                 <div className="mb-4">
                   <p className="text-sm text-gray-500">Ticket Price</p>
-                  <p className="text-3xl font-bold text-gray-900">${event.price}</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(event.price)}
+                  </p>
                 </div>
               ) : (
                 <div className="mb-4">
@@ -317,36 +325,64 @@ const UserEventDetails = () => {
                 </div>
               </div>
 
-              <button
-                onClick={handleBookEvent}
-                disabled={booking || isRegistered}
-                className={`w-full py-3 rounded-lg font-medium transition ${
-                  isRegistered
-                    ? "bg-green-600 text-white cursor-default"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
-              >
-                {booking ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Processing...
-                  </span>
-                ) : isRegistered ? (
-                  "Already Registered"
-                ) : (
-                  "Book Now"
-                )}
-              </button>
-
-              {isRegistered && (
-                <p className="text-center text-green-600 text-sm mt-3">
-                  You have successfully registered for this event!
-                </p>
+              {isRegistered ? (
+                <>
+                  <button
+                    disabled={true}
+                    className="w-full py-3 rounded-lg font-medium bg-green-600 text-white cursor-default mb-3"
+                  >
+                    Already Registered
+                  </button>
+                  <button
+                    onClick={handleCancelBooking}
+                    disabled={booking}
+                    className="w-full py-3 rounded-lg font-medium bg-red-100 text-red-600 hover:bg-red-200 transition"
+                  >
+                    {booking ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        Cancelling...
+                      </span>
+                    ) : (
+                      "Cancel Booking"
+                    )}
+                  </button>
+                  <p className="text-center text-green-600 text-sm mt-3">
+                    You have successfully registered for this event!
+                  </p>
+                </>
+              ) : (
+                <button
+                  onClick={handleBookEvent}
+                  disabled={booking}
+                  className="w-full py-3 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 transition"
+                >
+                  Book Now
+                </button>
               )}
             </div>
           </div>
         </div>
       </section>
+
+      {/* Booking Modal */}
+      {bookingModalOpen && event && (
+        <BookingModal
+          isOpen={bookingModalOpen}
+          onClose={() => setBookingModalOpen(false)}
+          service={{
+            _id: event._id,
+            title: event.title,
+            category: event.category,
+            price: event.price,
+            location: event.location,
+            images: event.images,
+            eventType: event.eventType,
+            ticketTypes: event.ticketTypes
+          }}
+          onBookingSuccess={handleBookingSuccess}
+        />
+      )}
     </UserLayout>
   );
 };

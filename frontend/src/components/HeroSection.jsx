@@ -1,6 +1,19 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { API_BASE } from "../lib/http";
 
 const HeroSection = () => {
+  const [stats, setStats] = useState({ totalEvents: null, totalUsers: null, totalMerchants: null });
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/admin/public-stats`)
+      .then((res) => { if (res.data.success) setStats(res.data.stats); })
+      .catch(() => {});
+  }, []);
+
+  const fmt = (n, fallback) => (n !== null && n !== undefined) ? n.toLocaleString() : fallback;
+
   return (
     <section className="relative overflow-hidden">
       {/* Background image - events related */}
@@ -55,20 +68,20 @@ const HeroSection = () => {
             </Link>
           </div>
           
-          {/* Stats */}
+          {/* Stats - Real data from DB */}
           <div className="mt-12 flex gap-8 animate-[fadeInUp_1.2s_ease-out]">
             <div>
-              <p className="text-2xl font-bold text-white drop-shadow-md">500+</p>
+              <p className="text-2xl font-bold text-white drop-shadow-md">{fmt(stats.totalEvents, "—")}</p>
               <p className="text-sm text-white/80">Events Hosted</p>
             </div>
             <div className="w-px bg-white/40"></div>
             <div>
-              <p className="text-2xl font-bold text-white drop-shadow-md">200+</p>
+              <p className="text-2xl font-bold text-white drop-shadow-md">{fmt(stats.totalMerchants, "—")}</p>
               <p className="text-sm text-white/80">Trusted Vendors</p>
             </div>
             <div className="w-px bg-white/40"></div>
             <div>
-              <p className="text-2xl font-bold text-white drop-shadow-md">10k+</p>
+              <p className="text-2xl font-bold text-white drop-shadow-md">{fmt(stats.totalUsers, "—")}</p>
               <p className="text-sm text-white/80">Happy Customers</p>
             </div>
           </div>
@@ -79,3 +92,4 @@ const HeroSection = () => {
 };
 
 export default HeroSection;
+

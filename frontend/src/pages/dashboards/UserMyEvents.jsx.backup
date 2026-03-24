@@ -1,0 +1,521 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import UserLayout from "../../components/user/UserLayout";
+import useAuth from "../../context/useAuth";
+import { API_BASE, authHeaders } from "../../lib/http";
+import toast from "react-hot-toast";
+import PaymentModal from "../../components/PaymentModal";
+import ServicePaymentModal from "../../components/ServicePaymentModal";
+import TicketSuccessModal from "../../components/TicketSuccessModal";
+import ServiceSuccessModal from "../../components/ServiceSuccessModal";
+import { generateTicketPDF } from "../../utils/ticketGenerator";
+import { generateInvoicePDF } from "../../utils/invoiceGenerator";
+import { FaTicketAlt, FaCalendarAlt, FaMapMarkerAlt, FaCreditCard, FaCheckCircle, FaClock, FaTimes, FaDownload, FaFileInvoice } from "react-icons/fa";
+
+const UserMyEvents = () => {
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
+  
+  // Modal states
+  const [paymentModal, setPaymentModal] = useState({ isOpen: false, booking: null });
+  const [servicePaymentModal, setServicePaymentModal] = useState({ isOpen: false, booking: null });
+  const [ticketModal, setTicketModal] = useState({ isOpen: false, ticketData: null });
+  const [serviceSuccessModal, setServiceSuccessModal] = useState({ isOpen: false, bookingData: null });
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
+  useEffect(() => {
+    fetchMyBookings();
+  }, []);
+
+  const fetchMyBookings = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/payments/user/bookings`, { 
+        headers: authHeaders(token) 
+      });
+      if (response.data.success) {
+        setBookings(response.data.bookings || []);
+      }
+    } catch (error) {
+      console.error("Failed to load bookings:", error);
+      toast.error("Failed to load your bookings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePayNowClick = (booking) => {
+    if (booking.eventType === "ticketed") {
+      setPaymentModal({ isOpen: true, booking });
+    } else {
+      // For full-service events, use the service payment modal
+      setServicePaymentModal({ isOpen: true, booking });
+    }
+  };
+
+  const handlePaymentSuccess = async (paymentMethod) => {
+    setPaymentLoading(true);
+    
+    try {
+      const booking = paymentModal.booking;
+      
+      const response = await axios.post(
+        `${API_BASE}/payments/booking/${booking._id}/pay`,
+        {
+          paymentMethod: paymentMethod,
+          paymentAmount: booking.totalPrice
+        },
+        { headers: authHeaders(token) }
+      );
+
+      if (response.data.success) {
+        // Close payment modal
+        setPaymentModal({ isOpen: false, booking: null });
+        
+        // Show ticket success modal
+        const ticketData = {
+          ...booking,
+          ...response.data.paymentDetails,
+          userName: user?.name || "User",
+          bookingId: booking._id,
+          paymentMethod: paymentMethod
+        };
+        
+        setTicketModal({ isOpen: true, ticketData });
+        
+        // Refresh bookings to show updated status
+        await fetchMyBookings();
+        
+        toast.success("Payment successful! Your ticket has been generated.");
+      } else {
+        throw new Error(response.data.message || "Payment failed");
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.error(error.response?.data?.message || "Payment failed");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleServicePaymentSuccess = async (updatedBooking) => {
+    setServicePaymentModal({ isOpen: false, booking: null });
+    
+    // Show service success modal
+    const serviceData = {
+      ...updatedBooking,
+      userName: user?.name || "User"
+    };
+    
+    setServiceSuccessModal({ isOpen: true, bookingData: serviceData });
+    
+    // Refresh bookings to show updated status
+    await fetchMyBookings();
+    
+    toast.success("Payment successful! Your service booking is confirmed.");
+  };
+
+  const handleDownloadInvoice = async (bookingData) => {
+    try {
+      await generateInvoicePDF(bookingData);
+      toast.success("Invoice downloaded successfully!");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download invoice");
+    }
+  };
+
+  const handleServiceViewBookings = () => {
+    setServiceSuccessModal({ isOpen: false, bookingData: null });
+    // Refresh the current page
+    fetchMyBookings();
+  };
+  };
+
+  const handleDownloadTicket = async (ticketData) => {
+    try {
+      await generateTicketPDF(ticketData);
+      toast.success("Ticket downloaded successfully!");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download ticket");
+    }
+  };
+
+  const handleDownloadExistingTicket = async (booking) => {
+    try {
+      const ticketData = {
+        eventTitle: booking.eventTitle,
+        ticketId: booking.ticketId,
+        userName: user?.name || "User",
+        eventDate: booking.eventDate,
+        location: booking.location || "Venue TBD",
+        merchantName: booking.merchantName,
+        ticketCount: booking.ticketCount || 1,
+        bookingId: booking._id,
+        paymentId: booking.paymentId,
+        amount: booking.totalPrice
+      };
+      
+      await generateTicketPDF(ticketData);
+      toast.success("Ticket downloaded successfully!");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download ticket");
+    }
+  };
+
+  const handleViewBookings = () => {
+    setTicketModal({ isOpen: false, ticketData: null });
+    // Navigate to the bookings page
+    navigate("/dashboard/user/bookings");
+  };
+
+  const getStatusBadge = (booking) => {
+    const status = booking.status.toLowerCase();
+    const paymentStatus = booking.paymentStatus;
+    const eventType = booking.eventType;
+
+    // For ticketed events, they should always show as confirmed if payment is completed
+    if (eventType === "ticketed" && paymentStatus === "Paid") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <FaCheckCircle className="text-xs" />
+          Confirmed
+        </span>
+      );
+    }
+
+    // For full-service events, follow the normal approval flow
+    if (status === "confirmed" && paymentStatus === "Paid") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <FaCheckCircle className="text-xs" />
+          Payment Completed
+        </span>
+      );
+    } else if (status === "approved" && eventType === "full-service") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <FaClock className="text-xs" />
+          Approved - Payment Pending
+        </span>
+      );
+    } else if (status === "pending" && eventType === "full-service") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <FaClock className="text-xs" />
+          Waiting for merchant approval
+        </span>
+      );
+    } else if (status === "rejected") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <FaTimes className="text-xs" />
+          Rejected
+        </span>
+      );
+    }
+    
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        {status}
+      </span>
+    );
+  };
+
+  const formatDate = (dateString, booking) => {
+    // For full-service events, check for serviceDate or selectedDate first
+    if (booking && booking.eventType === "full-service") {
+      const serviceDate = booking.serviceDate || booking.selectedDate;
+      if (serviceDate) {
+        return new Date(serviceDate).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric"
+        });
+      }
+      return "Date will be confirmed by merchant";
+    }
+    
+    // For ticketed events or when no booking context
+    if (!dateString) return "Date TBD";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+  };
+
+  const filteredBookings = bookings.filter((booking) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "pending") return booking.status === "pending";
+    if (activeTab === "approved") return booking.status === "approved";
+    if (activeTab === "confirmed") return booking.status === "confirmed" && booking.paymentStatus === "Paid";
+    return true;
+  });
+
+  return (
+    <UserLayout>
+      <section className="mb-6">
+        <h2 className="text-2xl md:text-3xl font-semibold">My Bookings</h2>
+        <p className="text-gray-600 mt-1">Manage your event bookings and payments</p>
+      </section>
+
+      {/* Stats Summary */}
+      <section className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-gray-500 text-sm">Total Bookings</p>
+          <p className="text-2xl font-bold text-gray-900">{bookings.length}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-gray-500 text-sm">Pending</p>
+          <p className="text-2xl font-bold text-yellow-600">
+            {bookings.filter(b => b.status === "pending").length}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-gray-500 text-sm">Approved</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {bookings.filter(b => b.status === "approved").length}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-gray-500 text-sm">Confirmed</p>
+          <p className="text-2xl font-bold text-green-600">
+            {bookings.filter(b => b.status === "confirmed" && b.paymentStatus === "Paid").length}
+          </p>
+        </div>
+      </section>
+
+      {/* Tabs */}
+      <section className="bg-white rounded-xl shadow-sm p-2 mb-6">
+        <div className="flex gap-2">
+          {[
+            { key: "all", label: "All" },
+            { key: "pending", label: "Pending" },
+            { key: "approved", label: "Approved" },
+            { key: "confirmed", label: "Confirmed" }
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                activeTab === tab.key
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Bookings List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      ) : filteredBookings.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl">
+          <FaTicketAlt className="mx-auto text-4xl text-gray-400 mb-4" />
+          <p className="text-gray-500 text-lg">No bookings found</p>
+          <p className="text-gray-400 mt-2">
+            {activeTab === "all" 
+              ? "You haven't booked any events yet" 
+              : `No ${activeTab} bookings found`
+            }
+          </p>
+          <button
+            onClick={() => navigate("/dashboard/user/browse")}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Browse Events
+          </button>
+        </div>
+      ) : (
+        <section className="space-y-4">
+          {filteredBookings.map((booking) => (
+            <div key={booking._id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                {/* Event Info */}
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        {booking.eventTitle}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Merchant: {booking.merchantName}
+                      </p>
+                    </div>
+                    {getStatusBadge(booking)}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <FaCalendarAlt className="text-purple-500" />
+                      <span>{formatDate(booking.eventDate, booking)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Show different icons and text based on event type */}
+                      {booking.eventType === "ticketed" ? (
+                        <>
+                          <FaTicketAlt className="text-blue-500" />
+                          <span>{booking.ticketCount} ticket{booking.ticketCount > 1 ? 's' : ''}</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaFileInvoice className="text-blue-500" />
+                          <span>Full Service Event</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FaCreditCard className="text-green-500" />
+                      <span>₹{booking.totalPrice?.toLocaleString() || 0}</span>
+                    </div>
+                  </div>
+
+                  {/* Ticket ID for confirmed bookings */}
+                  {booking.ticketId && (
+                    <div className="mt-3 p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        <strong>Ticket ID:</strong> {booking.ticketId}
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Your booking is confirmed! Present this ticket ID at the event.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col gap-2 lg:ml-6">
+                  {/* Pay Now button for approved full-service events */}
+                  {booking.eventType === "full-service" && booking.status === "approved" && booking.paymentStatus !== "Paid" && (
+                    <button
+                      onClick={() => handlePayNowClick(booking)}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                    >
+                      <FaCreditCard />
+                      Pay Now
+                    </button>
+                  )}
+                  
+                  {/* Download ticket button for confirmed ticketed events */}
+                  {booking.eventType === "ticketed" && booking.paymentStatus === "Paid" && booking.ticketId && (
+                    <button
+                      onClick={() => handleDownloadExistingTicket(booking)}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                      <FaDownload />
+                      Download Ticket
+                    </button>
+                  )}
+
+                  {/* Download invoice button for confirmed full-service events */}
+                  {booking.eventType === "full-service" && booking.paymentStatus === "Paid" && (
+                    <button
+                      onClick={() => handleDownloadInvoice(booking)}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                      <FaDownload />
+                      Download Invoice
+                    </button>
+                  )}
+                  
+                  {/* Status displays */}
+                  {booking.eventType === "ticketed" && booking.paymentStatus === "Paid" && (
+                    <div className="text-center">
+                      <p className="text-sm text-green-600 font-medium">
+                        ✅ Ticket Confirmed
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Ready for event
+                      </p>
+                    </div>
+                  )}
+                  
+                  {booking.eventType === "full-service" && booking.paymentStatus === "Paid" && (
+                    <div className="text-center">
+                      <p className="text-sm text-green-600 font-medium">
+                        ✅ Payment Completed
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Service confirmed
+                      </p>
+                    </div>
+                  )}
+                  
+                  {booking.eventType === "full-service" && booking.status === "pending" && (
+                    <div className="text-center">
+                      <p className="text-sm text-yellow-600 font-medium">
+                        ⏳ Awaiting Approval
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Merchant will review soon
+                      </p>
+                    </div>
+                  )}
+                  
+                  {booking.status === "rejected" && (
+                    <div className="text-center">
+                      <p className="text-sm text-red-600 font-medium">
+                        ❌ Booking Rejected
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Contact merchant for details
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={paymentModal.isOpen}
+        onClose={() => setPaymentModal({ isOpen: false, booking: null })}
+        booking={paymentModal.booking}
+        onPaymentSuccess={handlePaymentSuccess}
+        loading={paymentLoading}
+      />
+
+      {/* Service Payment Modal */}
+      <ServicePaymentModal
+        isOpen={servicePaymentModal.isOpen}
+        onClose={() => setServicePaymentModal({ isOpen: false, booking: null })}
+        booking={servicePaymentModal.booking}
+        onPaymentSuccess={handleServicePaymentSuccess}
+      />
+
+      {/* Ticket Success Modal */}
+      <TicketSuccessModal
+        isOpen={ticketModal.isOpen}
+        onClose={() => setTicketModal({ isOpen: false, ticketData: null })}
+        ticketData={ticketModal.ticketData}
+        onDownloadTicket={handleDownloadTicket}
+        onViewBookings={handleViewBookings}
+      />
+
+      {/* Service Success Modal */}
+      <ServiceSuccessModal
+        isOpen={serviceSuccessModal.isOpen}
+        onClose={() => setServiceSuccessModal({ isOpen: false, bookingData: null })}
+        bookingData={serviceSuccessModal.bookingData}
+        onDownloadInvoice={handleDownloadInvoice}
+        onViewBookings={handleServiceViewBookings}
+      />
+    </UserLayout>
+  );
+};
+
+export default UserMyEvents;

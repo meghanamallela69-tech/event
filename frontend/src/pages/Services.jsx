@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FaGlassCheers,
@@ -15,148 +15,98 @@ import {
   FaStar,
   FaTimes,
   FaCheckCircle,
+  FaSpinner,
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
+import axios from "axios";
 import useAuth from "../context/useAuth";
 import BookingModal from "../components/BookingModal";
+import { API_BASE } from "../lib/http";
 
 const Services = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
   
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [priceRange, setPriceRange] = useState([0, 100000]);
+  const [maxPrice, setMaxPrice] = useState(100000);
   const [selectedRating, setSelectedRating] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [bookedServiceId, setBookedServiceId] = useState(null);
 
-  const items = [
-    {
-      id: "wedding-1",
-      title: "Wedding Planning",
-      desc: "End-to-end planning and coordination.",
-      icon: FaGlassCheers,
-      color: "bg-pink-50 text-pink-600",
-      img: "/wedding.jpg",
-      category: "wedding",
-      price: 75000,
-      rating: 5,
-    },
-    {
-      id: "corporate-1",
-      title: "Corporate Events",
-      desc: "Conferences, retreats, and product launches.",
-      icon: FaBuilding,
-      color: "bg-indigo-50 text-indigo-600",
-      img: "/restaurant.jpg",
-      category: "corporate",
-      price: 50000,
-      rating: 4,
-    },
-    {
-      id: "birthday-1",
-      title: "Birthday Parties",
-      desc: "Themes, décor, and entertainment.",
-      icon: FaBirthdayCake,
-      color: "bg-amber-50 text-amber-600",
-      img: "/birthday.jpg",
-      category: "birthday",
-      price: 25000,
-      rating: 5,
-    },
-    {
-      id: "catering-1",
-      title: "Catering",
-      desc: "Custom menus and full-service catering.",
-      icon: FaUtensils,
-      color: "bg-rose-50 text-rose-600",
-      img: "/party.jpg",
-      category: "catering",
-      price: 30000,
-      rating: 4,
-    },
-    {
-      id: "photography-1",
-      title: "Photography",
-      desc: "Professional photo and video coverage.",
-      icon: FaCamera,
-      color: "bg-blue-50 text-blue-600",
-      img: "/anniversary.jpg",
-      category: "photography",
-      price: 15000,
-      rating: 5,
-    },
-    {
-      id: "decoration-1",
-      title: "Decoration",
-      desc: "Themed décor and floral arrangements.",
-      icon: FaPaintBrush,
-      color: "bg-emerald-50 text-emerald-600",
-      img: "/gamenight.jpg",
-      category: "decoration",
-      price: 20000,
-      rating: 4,
-    },
-    {
-      id: "concert-1",
-      title: "Music Concerts",
-      desc: "Live music events and concert planning.",
-      icon: FaMusic,
-      color: "bg-purple-50 text-purple-600",
-      img: "/camping.jpg",
-      category: "concert",
-      price: 85000,
-      rating: 5,
-    },
-    {
-      id: "camping-1",
-      title: "Camping Trips",
-      desc: "Outdoor adventures and camping events.",
-      icon: FaCampground,
-      color: "bg-green-50 text-green-600",
-      img: "/camping.jpg",
-      category: "camping",
-      price: 35000,
-      rating: 4,
-    },
-    {
-      id: "gaming-1",
-      title: "Game Nights",
-      desc: "Fun gaming events and tournaments.",
-      icon: FaGamepad,
-      color: "bg-orange-50 text-orange-600",
-      img: "/gamenight.jpg",
-      category: "gaming",
-      price: 10000,
-      rating: 3,
-    },
-    {
-      id: "anniversary-1",
-      title: "Anniversary Celebrations",
-      desc: "Special milestone event planning.",
-      icon: FaGlassCheers,
-      color: "bg-red-50 text-red-600",
-      img: "/anniversary.jpg",
-      category: "anniversary",
-      price: 40000,
-      rating: 5,
-    },
-  ];
+  // Category icon map
+  const categoryIconMap = {
+    wedding: FaGlassCheers,
+    corporate: FaBuilding,
+    birthday: FaBirthdayCake,
+    catering: FaUtensils,
+    photography: FaCamera,
+    decoration: FaPaintBrush,
+    concert: FaMusic,
+    camping: FaCampground,
+    gaming: FaGamepad,
+    anniversary: FaGlassCheers,
+    party: FaGlassCheers,
+    other: FaGlassCheers,
+  };
 
-  const categories = [
-    { value: "wedding", label: "Wedding" },
-    { value: "corporate", label: "Corporate" },
-    { value: "birthday", label: "Birthday" },
-    { value: "catering", label: "Catering" },
-    { value: "photography", label: "Photography" },
-    { value: "decoration", label: "Decoration" },
-    { value: "concert", label: "Concert" },
-    { value: "camping", label: "Camping" },
-    { value: "gaming", label: "Gaming" },
-    { value: "anniversary", label: "Anniversary" },
-  ];
+  const categoryColorMap = {
+    wedding: "bg-pink-50 text-pink-600",
+    corporate: "bg-indigo-50 text-indigo-600",
+    birthday: "bg-amber-50 text-amber-600",
+    catering: "bg-rose-50 text-rose-600",
+    photography: "bg-blue-50 text-blue-600",
+    decoration: "bg-emerald-50 text-emerald-600",
+    concert: "bg-purple-50 text-purple-600",
+    camping: "bg-green-50 text-green-600",
+    gaming: "bg-orange-50 text-orange-600",
+    anniversary: "bg-red-50 text-red-600",
+    party: "bg-yellow-50 text-yellow-600",
+    other: "bg-gray-50 text-gray-600",
+  };
+
+  // Fetch real events (created by merchants) from API
+  const fetchServices = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE}/events`);
+      const events = res.data.events || [];
+      // Map event fields to match card rendering expectations
+      const mapped = events.map((ev) => ({
+        ...ev,
+        id: ev._id,
+        description: ev.description || ev.title,
+        price: ev.price || 0,
+        rating: ev.rating || 0,
+        category: (ev.category || "other").toLowerCase(),
+        images: ev.images || [],
+      }));
+      setServices(mapped);
+      // Set max price dynamically from actual event prices
+      const highest = Math.max(...mapped.map((e) => e.price || 0), 100000);
+      const roundedMax = Math.ceil(highest / 100000) * 100000; // round up to nearest lakh
+      setMaxPrice(roundedMax);
+      setPriceRange([0, roundedMax]);
+    } catch (err) {
+      toast.error("Failed to load services");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  // Derive unique categories from real data
+  const categories = [...new Set(services.map((s) => s.category))]
+    .filter(Boolean)
+    .map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   // Handle booking button click
   const handleBookClick = (service) => {
@@ -179,7 +129,7 @@ const Services = () => {
 
   // Handle successful booking
   const handleBookingSuccess = (booking) => {
-    setBookedServiceId(booking.serviceId);
+    setBookedServiceId(booking.serviceId || booking._id);
     toast.success("Booking confirmed! Check your dashboard for details.");
   };
 
@@ -193,7 +143,6 @@ const Services = () => {
         const service = JSON.parse(pendingBooking);
         setSelectedService(service);
         setIsBookingModalOpen(true);
-        // Clear pending booking so it doesn't reopen on refresh
         localStorage.removeItem("pendingBooking");
       } catch (e) {
         console.error("Failed to parse pending booking:", e);
@@ -203,21 +152,15 @@ const Services = () => {
   }, []);
 
   // Filter services based on all criteria
-  const filteredItems = items.filter((item) => {
-    // Search query filter
+  const filteredItems = services.filter((item) => {
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch = !query || 
-      item.title.toLowerCase().includes(query) ||
-      item.category.toLowerCase().includes(query) ||
-      item.desc.toLowerCase().includes(query);
+      (item.title || "").toLowerCase().includes(query) ||
+      (item.category || "").toLowerCase().includes(query) ||
+      (item.description || "").toLowerCase().includes(query);
 
-    // Price range filter
     const matchesPrice = item.price >= priceRange[0] && item.price <= priceRange[1];
-
-    // Rating filter
     const matchesRating = !selectedRating || item.rating >= parseInt(selectedRating);
-
-    // Category filter
     const matchesCategory = !selectedCategory || item.category === selectedCategory;
 
     return matchesSearch && matchesPrice && matchesRating && matchesCategory;
@@ -225,12 +168,12 @@ const Services = () => {
 
   const clearAllFilters = () => {
     setSearchQuery("");
-    setPriceRange([0, 100000]);
+    setPriceRange([0, maxPrice]);
     setSelectedRating("");
     setSelectedCategory("");
   };
 
-  const hasActiveFilters = searchQuery || priceRange[1] < 100000 || selectedRating || selectedCategory;
+  const hasActiveFilters = searchQuery || priceRange[1] < maxPrice || selectedRating || selectedCategory;
 
   // Format price to Indian format
   const formatPrice = (price) => {
@@ -340,15 +283,15 @@ const Services = () => {
                 <input
                   type="range"
                   min="0"
-                  max="100000"
-                  step="5000"
+                  max={maxPrice}
+                  step={Math.max(10000, Math.floor(maxPrice / 100) * 5000)}
                   value={priceRange[1]}
                   onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
                   style={{
                     width: '100%',
                     height: '6px',
                     borderRadius: '3px',
-                    background: `linear-gradient(to right, #a2783a 0%, #a2783a ${(priceRange[1] / 100000) * 100}%, #e5e7eb ${(priceRange[1] / 100000) * 100}%, #e5e7eb 100%)`,
+                    background: `linear-gradient(to right, #a2783a 0%, #a2783a ${(priceRange[1] / maxPrice) * 100}%, #e5e7eb ${(priceRange[1] / maxPrice) * 100}%, #e5e7eb 100%)`,
                     outline: 'none',
                     cursor: 'pointer',
                     WebkitAppearance: 'none',
@@ -358,7 +301,7 @@ const Services = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280' }}>
                 <span>₹0</span>
                 <span style={{ fontWeight: '500', color: '#a2783a' }}>{formatPrice(priceRange[1])}</span>
-                <span>₹1,00,000</span>
+                <span>{formatPrice(maxPrice)}</span>
               </div>
             </div>
 
@@ -403,7 +346,7 @@ const Services = () => {
               ))}
             </div>
 
-            {/* Category Filter */}
+            {/* Category Filter — derived from real DB data */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '12px' }}>
                 Category
@@ -442,197 +385,212 @@ const Services = () => {
               marginBottom: '20px',
             }}>
               <p style={{ color: '#6b7280', fontSize: '14px' }}>
-                {filteredItems.length > 0 
-                  ? `Showing ${filteredItems.length} of ${items.length} services`
-                  : 'No services found'
+                {loading ? 'Loading events...' :
+                  filteredItems.length > 0 
+                    ? `Showing ${filteredItems.length} of ${services.length} events`
+                    : services.length === 0 
+                      ? 'No events have been created yet'
+                      : 'No events found'
                 }
               </p>
             </div>
 
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-              gap: '24px' 
-            }}>
-              {filteredItems.length > 0 ? (
-                filteredItems.map((s) => (
-                  <div key={s.id} style={{
-                    backgroundColor: 'white',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    transition: 'all 0.3s ease',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }} className="service-card">
-                    <div style={{ 
-                      position: 'relative', 
-                      width: '100%', 
-                      height: '180px',
-                      overflow: 'hidden'
-                    }}>
-                      <img 
-                        src={s.img} 
-                        alt={s.title} 
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '12px',
-                        left: '12px',
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '8px',
+            {/* Loading State */}
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#a2783a' }}>
+                <FaSpinner style={{ fontSize: '48px', marginBottom: '16px', animation: 'spin 1s linear infinite' }} />
+                <p style={{ fontSize: '16px' }}>Loading events...</p>
+              </div>
+            ) : (
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                gap: '24px' 
+              }}>
+                {filteredItems.length > 0 ? (
+                  filteredItems.map((s) => {
+                    const Icon = categoryIconMap[s.category] || FaGlassCheers;
+                    const colorClass = categoryColorMap[s.category] || "bg-gray-50 text-gray-600";
+                    const imgSrc = s.images?.[0]?.url || s.image || s.bannerImage || null;
+                    const isBooked = bookedServiceId === s._id || bookedServiceId === s.id;
+                    return (
+                      <div key={s._id} style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        transition: 'all 0.3s ease',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }} className={s.color}>
-                        <s.icon />
-                      </div>
-                      {/* Rating Badge */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        backgroundColor: 'rgba(255,255,255,0.95)',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                      }}>
-                        <FaStar style={{ color: '#fbbf24' }} />
-                        {s.rating}.0
-                      </div>
-                      {/* Booked Badge */}
-                      {bookedServiceId === s.id && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '12px',
-                          left: '12px',
-                          backgroundColor: '#10b981',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          color: 'white',
+                        flexDirection: 'column'
+                      }} className="service-card">
+                        <div style={{ 
+                          position: 'relative', 
+                          width: '100%', 
+                          height: '180px',
+                          overflow: 'hidden'
                         }}>
-                          <FaCheckCircle /> Booked
+                          {imgSrc ? (
+                            <img 
+                              src={imgSrc} 
+                              alt={s.title} 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '100%',
+                              height: '100%',
+                              background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Icon style={{ fontSize: '48px', color: '#9ca3af' }} />
+                            </div>
+                          )}
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '12px',
+                            left: '12px',
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            backgroundColor: 'white',
+                          }}>
+                            <Icon className={colorClass.split(' ')[1]} />
+                          </div>
+                          {/* Rating Badge */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            backgroundColor: 'rgba(255,255,255,0.95)',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                          }}>
+                            <FaStar style={{ color: '#fbbf24' }} />
+                            {s.rating > 0 ? s.rating.toFixed(1) : 'New'}
+                          </div>
+                          {/* Booked Badge */}
+                          {isBooked && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '12px',
+                              left: '12px',
+                              backgroundColor: '#10b981',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              color: 'white',
+                            }}>
+                              <FaCheckCircle /> Booked
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <h3 style={{ 
-                        fontSize: '18px', 
-                        fontWeight: '600', 
-                        marginBottom: '8px',
-                        color: '#1f2937'
-                      }}>{s.title}</h3>
-                      <p style={{ 
-                        fontSize: '14px', 
-                        color: '#6b7280', 
-                        marginBottom: '8px',
-                        flex: 1
-                      }}>{s.desc}</p>
-                      <p style={{ 
-                        fontSize: '16px', 
-                        fontWeight: '600', 
-                        color: '#a2783a',
-                        marginBottom: '12px'
-                      }}>
-                        Starting from {formatPrice(s.price)}
-                      </p>
+                        <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                          <h3 style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '600', 
+                            marginBottom: '8px',
+                            color: '#1f2937'
+                          }}>{s.title}</h3>
+                          <p style={{ 
+                            fontSize: '14px', 
+                            color: '#6b7280', 
+                            marginBottom: '8px',
+                            flex: 1
+                          }}>{s.description}</p>
+                          <p style={{ 
+                            fontSize: '16px', 
+                            fontWeight: '600', 
+                            color: '#a2783a',
+                            marginBottom: '12px'
+                          }}>
+                            Starting from {formatPrice(s.price)}
+                          </p>
+                          <button
+                            onClick={() => handleBookClick(s)}
+                            disabled={isBooked}
+                            style={{
+                              display: 'inline-block',
+                              width: '100%',
+                              padding: '10px 0',
+                              backgroundColor: isBooked ? '#10b981' : '#a2783a',
+                              color: 'white',
+                              textAlign: 'center',
+                              borderRadius: '8px',
+                              textDecoration: 'none',
+                              fontWeight: '500',
+                              transition: 'background-color 0.3s',
+                              border: 'none',
+                              cursor: isBooked ? 'default' : 'pointer',
+                            }}
+                            onMouseEnter={(e) => { if (!isBooked) e.target.style.backgroundColor = '#8b6a30'; }}
+                            onMouseLeave={(e) => { if (!isBooked) e.target.style.backgroundColor = '#a2783a'; }}
+                          >
+                            {isBooked ? 'Booked ✓' : 'Book Now'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '60px 20px',
+                    color: '#6b7280'
+                  }}>
+                    <FaSadTear style={{ fontSize: '64px', color: '#a2783a', marginBottom: '20px' }} />
+                    <h3 style={{ fontSize: '24px', fontWeight: '500', marginBottom: '10px', color: '#a2783a' }}>
+                      {services.length === 0 ? 'No events available yet' : 'No events found'}
+                    </h3>
+                    <p style={{ fontSize: '16px', marginBottom: '20px' }}>
+                      {services.length === 0
+                        ? 'Events created by merchants will appear here.'
+                        : 'No events match your current filters'}
+                    </p>
+                    {services.length > 0 && (
                       <button
-                        onClick={() => handleBookClick(s)}
-                        disabled={bookedServiceId === s.id}
+                        onClick={clearAllFilters}
                         style={{
-                          display: 'inline-block',
-                          width: '100%',
-                          padding: '10px 0',
-                          backgroundColor: bookedServiceId === s.id ? '#10b981' : '#a2783a',
+                          marginTop: '10px',
+                          padding: '12px 28px',
+                          backgroundColor: '#a2783a',
                           color: 'white',
-                          textAlign: 'center',
+                          border: 'none',
                           borderRadius: '8px',
-                          textDecoration: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
                           fontWeight: '500',
                           transition: 'background-color 0.3s',
-                          border: 'none',
-                          cursor: bookedServiceId === s.id ? 'default' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
                         }}
-                        onMouseEnter={(e) => {
-                          if (bookedServiceId !== s.id) {
-                            e.target.style.backgroundColor = '#8b6a30';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (bookedServiceId !== s.id) {
-                            e.target.style.backgroundColor = '#a2783a';
-                          }
-                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#8b6a30'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#a2783a'}
                       >
-                        {bookedServiceId === s.id ? 'Booked ✓' : 'Book Now'}
+                        <FaTimes /> Clear All Filters
                       </button>
-                    </div>
+                    )}
                   </div>
-                ))
-              ) : (
-                <div style={{
-                  gridColumn: '1 / -1',
-                  textAlign: 'center',
-                  padding: '60px 20px',
-                  color: '#6b7280'
-                }}>
-                  <FaSadTear style={{
-                    fontSize: '64px',
-                    color: '#a2783a',
-                    marginBottom: '20px'
-                  }} />
-                  <h3 style={{
-                    fontSize: '24px',
-                    fontWeight: '500',
-                    marginBottom: '10px',
-                    color: '#a2783a'
-                  }}>
-                    No services found
-                  </h3>
-                  <p style={{ fontSize: '16px', marginBottom: '20px' }}>
-                    No services match your current filters
-                  </p>
-                  <button
-                    onClick={clearAllFilters}
-                    style={{
-                      marginTop: '10px',
-                      padding: '12px 28px',
-                      backgroundColor: '#a2783a',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      transition: 'background-color 0.3s',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#8b6a30'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#a2783a'}
-                  >
-                    <FaTimes /> Clear All Filters
-                  </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -3,9 +3,18 @@ import { Registration } from "../models/registrationSchema.js";
 
 export const listEvents = async (req, res) => {
   try {
-    const events = await Event.find().sort({ date: 1 });
+    const events = await Event.find()
+      .select('title description price category date time location eventType addons ticketTypes availableTickets totalTickets images createdBy status')
+      .sort({ date: 1 });
+    
+    // Debug: Log first event to check addons
+    if (events.length > 0) {
+      console.log('First event addons:', events[0].addons);
+    }
+    
     return res.status(200).json({ success: true, events });
-  } catch {
+  } catch (error) {
+    console.error('Error fetching events:', error);
     return res.status(500).json({ success: false, message: "Unknown Error" });
   }
 };

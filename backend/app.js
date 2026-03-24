@@ -8,6 +8,12 @@ import merchantRouter from "./router/merchantRouter.js";
 import adminRouter from "./router/adminRouter.js";
 import bookingRouter from "./router/bookingRouter.js";
 import serviceRouter from "./router/serviceRouter.js";
+import paymentsRouter from "./router/paymentsRouter.js";
+import reviewRouter from "./router/reviewRouter.js";
+import ratingRouter from "./router/ratingRouter.js";
+import notificationRouter from "./router/notificationRouter.js";
+import couponRouter from "./router/couponRouter.js";
+import followRouter from "./router/followRouter.js";
 import cors from "cors";
 import { ensureAdmin } from "./util/ensureAdmin.js";
 
@@ -33,6 +39,12 @@ app.use("/api/v1/merchant", merchantRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/services", serviceRouter);
+app.use("/api/v1/payments", paymentsRouter);
+app.use("/api/v1/reviews", reviewRouter);
+app.use("/api/v1/ratings", ratingRouter);
+app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/coupons", couponRouter);
+app.use("/api/v1/follow", followRouter);
 
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({ status: "ok" });
@@ -49,19 +61,30 @@ app.get("/api/v1/config-check", (req, res) => {
   });
 });
 
-dbConnection();
-
-// Ensure admin is created after DB connection is ready
-const initAdmin = async () => {
+// Initialize database connection and admin
+const initializeApp = async () => {
   try {
-    await ensureAdmin();
-    console.log("Admin initialization completed");
+    console.log("🚀 Starting application initialization...");
+    
+    // Connect to database first
+    const connection = await dbConnection();
+    console.log("✅ Database connection established");
+    
+    // Only initialize admin after successful database connection
+    if (connection) {
+      console.log("👤 Initializing admin user...");
+      await ensureAdmin();
+      console.log("✅ Admin initialization completed");
+    }
   } catch (error) {
-    console.error("Admin initialization failed:", error);
+    console.error("❌ Application initialization failed:", error.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
   }
 };
 
-// Delay admin creation slightly to ensure DB is connected
-setTimeout(initAdmin, 2000);
+// Start initialization
+initializeApp();
 
 export default app;

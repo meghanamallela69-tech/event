@@ -27,25 +27,36 @@ const UserDashboard = () => {
   const loadData = useCallback(async () => {
     const headers = authHeaders(token);
     try {
-      const [regsRes, eventsRes] = await Promise.all([
-        axios.get(`${API_BASE}/events/my-registrations`, { headers }),
-        axios.get(`${API_BASE}/events`, { headers }),
-      ]);
-      setRegistrations(regsRes.data.registrations || []);
-      setEvents(eventsRes.data.events || []);
+      // Get user's bookings (new booking system) - backend now includes event images
+      const bookingsRes = await axios.get(`${API_BASE}/bookings/my-bookings`, { headers });
+      const bookings = bookingsRes.data.bookings || [];
+      setRegistrations(bookings); // Using same state variable for consistency
+      
+      // Extract events from bookings - create event-like objects from booking data
+      const eventsFromBookings = bookings.map(booking => ({
+        _id: booking.serviceId || booking._id,
+        title: booking.serviceTitle,
+        category: booking.serviceCategory,
+        location: booking.location,
+        date: booking.eventDate,
+        time: booking.eventTime,
+        price: booking.totalPrice,
+        image: booking.eventImage // Backend now provides this
+      }));
+      setEvents(eventsFromBookings);
       
       // Generate notifications based on upcoming events
-      const upcomingRegs = (regsRes.data.registrations || []).filter(
-        r => new Date(r.event?.date) >= new Date()
+      const upcomingBookings = bookings.filter(
+        b => new Date(b.eventDate) >= new Date()
       );
-      const notifs = upcomingRegs.slice(0, 5).map(r => ({
-        id: r._id,
-        message: `"${r.event?.title}" is coming up on ${new Date(r.event?.date).toLocaleDateString()}`,
-        date: r.event?.date
+      const notifs = upcomingBookings.slice(0, 5).map(b => ({
+        id: b._id,
+        message: `"${b.serviceTitle}" is coming up on ${new Date(b.eventDate).toLocaleDateString()}`,
+        date: b.eventDate
       }));
       setNotifications(notifs);
     } catch (error) {
-      console.error("Failed to load dashboard data");
+      console.error("Failed to load dashboard data", error);
     }
   }, [token]);
 
@@ -56,7 +67,7 @@ const UserDashboard = () => {
 
   const stats = {
     bookings: registrations.length,
-    upcoming: registrations.filter(r => new Date(r.event?.date) >= new Date()).length,
+    upcoming: registrations.filter(b => new Date(b.eventDate) >= new Date()).length,
     saved: savedEvents.length,
     notifications: notifications.length,
   };
@@ -128,13 +139,16 @@ const UserDashboard = () => {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {recentBookings.map((booking) => {
-              const status = getStatusColor(booking.event?.date);
+              const status = getStatusColor(booking.eventDate);
               
-              // Get image based on category or title keywords
-              const getEventImage = (event) => {
-                if (event?.image && event.image.trim() !== "") {
-                  return event.image;
+              // Get image - prioritize real event image, then category-based fallback
+              const getEventImage = (booking) => {
+                // First, try to use the real event image
+                if (booking.eventImage) {
+                  return booking.eventImage;
                 }
+                
+                // Fallback to category-based images
                 const categoryImages = {
                   "Wedding": "/wedding.jpg",
                   "Party": "/party.jpg",
@@ -146,10 +160,13 @@ const UserDashboard = () => {
                   "Birthday": "/birthday.jpg",
                   "Anniversary": "/anniversary.jpg"
                 };
-                if (event?.category && categoryImages[event.category]) {
-                  return categoryImages[event.category];
+                
+                if (booking.serviceCategory && categoryImages[booking.serviceCategory]) {
+                  return categoryImages[booking.serviceCategory];
                 }
-                const title = (event?.title || "").toLowerCase();
+                
+                // Fallback based on title keywords
+                const title = (booking.serviceTitle || "").toLowerCase();
                 if (title.includes("wedding") || title.includes("marriage")) return "/wedding.jpg";
                 if (title.includes("music") || title.includes("concert") || title.includes("band")) return "/party.jpg";
                 if (title.includes("party") || title.includes("celebration")) return "/party.jpg";
@@ -158,28 +175,30 @@ const UserDashboard = () => {
                 if (title.includes("food") || title.includes("dinner")) return "/restaurant.jpg";
                 if (title.includes("outdoor") || title.includes("camping")) return "/camping.jpg";
                 if (title.includes("anniversary")) return "/anniversary.jpg";
+                
+                // Default fallback
                 return "/party.jpg";
               };
               
-              const eventImage = getEventImage(booking.event);
+              const eventImage = getEventImage(booking);
               
               return (
                 <div 
                   key={booking._id} 
                   className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer"
-                  onClick={() => navigate(`/dashboard/user/events/${booking.event?._id}`)}
+                  onClick={() => navigate(`/dashboard/user/bookings`)}
                 >
                   {/* Card Header with Event Image */}
                   <div className="relative h-32 overflow-hidden">
                     <img 
                       src={eventImage} 
-                      alt={booking.event?.title || "Event"}
+                      alt={booking.serviceTitle || "Event"}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
                     <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <h4 className="text-white font-semibold text-base truncate">{booking.event?.title || "Event"}</h4>
-                      <p className="text-white/80 text-xs">{booking.event?.category || "Event"}</p>
+                      <h4 className="text-white font-semibold text-base truncate">{booking.serviceTitle || "Event"}</h4>
+                      <p className="text-white/80 text-xs">{booking.serviceCategory || "Event"}</p>
                     </div>
                     {/* Status Badge on Image */}
                     <span className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${status.bg} ${status.text}`}>
@@ -191,17 +210,19 @@ const UserDashboard = () => {
                   <div className="p-3 space-y-2">
                     <div className="flex items-center gap-2 text-gray-600 text-sm">
                       <FaCalendarCheck className="text-blue-500 flex-shrink-0" />
-                      <span>{formatDate(booking.event?.date)}{booking.event?.time ? ` at ${booking.event.time}` : ""}</span>
+                      <span>{formatDate(booking.eventDate)}{booking.eventTime ? ` at ${booking.eventTime}` : ""}</span>
                     </div>
                     
                     <div className="flex items-center gap-2 text-gray-600 text-sm">
                       <FaMapMarkerAlt className="text-red-500 flex-shrink-0" />
-                      <span className="truncate">{booking.event?.location || "Location TBD"}</span>
+                      <span className="truncate">{booking.location || "Location TBD"}</span>
                     </div>
                     
                     <div className="flex items-center justify-between pt-2 border-t">
                       <span className="text-sm font-semibold text-blue-600">
-                        {booking.event?.price ? `$${booking.event.price}` : "Free"}
+                        {booking.totalPrice 
+                          ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(booking.totalPrice)
+                          : "Free"}
                       </span>
                       <button className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm">
                         <FaEye className="text-xs" />

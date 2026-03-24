@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Book Now Button Test</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h1>Book Now Button Test</h1>
+    <button onclick="testBookNow()">Test Book Now</button>
+    <div id="result"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/v1';
+        const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWI5MmIwYmZjNmQxYWRiYmEyYjJmYWQiLCJyb2xlIjoidXNlciIsImlhdCI6MTczNzM4NzE5MSwiZXhwIjoxNzM3OTkxOTkxfQ.Ej8Ej_Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8'; // Replace with actual token
+
+        async function testBookNow() {
+            try {
+                console.log('Testing Book Now functionality...');
+                
+                // First, get events
+                const eventsResponse = await axios.get(`${API_BASE}/events`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                console.log('Events response:', eventsResponse.data);
+                
+                if (eventsResponse.data.success && eventsResponse.data.events.length > 0) {
+                    const event = eventsResponse.data.events[0];
+                    console.log('First event:', event);
+                    console.log('Event type:', event.eventType);
+                    
+                    // Test booking based on event type
+                    if (event.eventType === 'full-service') {
+                        console.log('Testing full-service booking...');
+                        const bookingResponse = await axios.post(`${API_BASE}/event-bookings/create`, {
+                            eventId: event._id,
+                            serviceDate: '2026-04-15',
+                            guestCount: 2,
+                            notes: 'Test booking from HTML'
+                        }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        console.log('Booking response:', bookingResponse.data);
+                    } else if (event.eventType === 'ticketed') {
+                        console.log('Testing ticketed booking...');
+                        // First get ticket types
+                        const ticketsResponse = await axios.get(`${API_BASE}/event-bookings/event/${event._id}/tickets`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        console.log('Tickets response:', ticketsResponse.data);
+                        
+                        if (ticketsResponse.data.success && ticketsResponse.data.ticketTypes.length > 0) {
+                            const ticketType = ticketsResponse.data.ticketTypes[0];
+                            const bookingResponse = await axios.post(`${API_BASE}/event-bookings/create`, {
+                                eventId: event._id,
+                                ticketType: ticketType.name,
+                                quantity: 1,
+                                paymentMethod: 'Card'
+                            }, {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            console.log('Booking response:', bookingResponse.data);
+                        }
+                    }
+                }
+                
+                document.getElementById('result').innerHTML = '<p style="color: green;">Check console for results</p>';
+            } catch (error) {
+                console.error('Test error:', error);
+                document.getElementById('result').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

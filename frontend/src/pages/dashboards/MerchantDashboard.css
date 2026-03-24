@@ -1,0 +1,49 @@
+/* Merchant Dashboard Specific Styles */
+
+/* Force white text on stat cards */
+.merchant-stat-card {
+  color: white !important;
+}
+
+.merchant-stat-card * {
+  color: white !important;
+}
+
+.merchant-stat-card p,
+.merchant-stat-card h3,
+.merchant-stat-card svg {
+  color: white !important;
+  fill: white !important;
+}
+
+/* Specific targeting for different elements */
+.merchant-stat-card .stat-title {
+  color: rgba(255, 255, 255, 0.9) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.merchant-stat-card .stat-value {
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.merchant-stat-card .stat-icon {
+  color: white !important;
+}
+
+/* Override any Tailwind or global styles */
+.merchant-dashboard .bg-gradient-to-br * {
+  color: white !important;
+}
+
+/* Button styles */
+.merchant-btn {
+  background-color: #7c3aed !important;
+  color: white !important;
+  border: none !important;
+}
+
+.merchant-btn:hover {
+  background-color: #6d28d9 !important;
+  color: white !important;
+}
