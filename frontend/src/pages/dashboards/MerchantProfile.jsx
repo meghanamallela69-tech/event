@@ -1,15 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import MerchantLayout from "../../components/merchant/MerchantLayout";
 import useAuth from "../../context/useAuth";
 import { API_BASE, authHeaders } from "../../lib/http";
-import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaBuilding } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaBuilding, FaCamera } from "react-icons/fa";
+import { AiOutlineUpload } from "react-icons/ai";
 import toast from "react-hot-toast";
 
 const MerchantProfile = () => {
   const { token, user, login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -18,41 +20,102 @@ const MerchantProfile = () => {
     businessName: "",
     bio: "",
   });
+  const [previewImage, setPreviewImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Fetch profile data
+  const fetchProfile = async () => {
+    try {
+      const { data } = await axios.get(`${API_BASE}/auth/profile`, {
+        headers: authHeaders(token)
+      });
+      if (data.success) {
+        setProfileData(data.user);
+        setFormData({
+          name: data.user.name || "",
+          email: data.user.email || "",
+          phone: data.user.phone || "",
+          address: data.user.address || "",
+          businessName: data.user.businessName || "",
+          bio: data.user.bio || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      toast.error(error?.response?.data?.message || "Failed to load profile");
+    }
+  };
 
   useEffect(() => {
-    if (user) {
-      setFormData({
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        address: user.address || "",
-        businessName: user.businessName || "",
-        bio: user.bio || "",
-      });
-    }
-  }, [user]);
+    fetchProfile();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setPreviewImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
+      // Create FormData for file upload
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('phone', formData.phone);
+      formDataToSend.append('address', formData.address);
+      formDataToSend.append('businessName', formData.businessName);
+      formDataToSend.append('bio', formData.bio);
+      
+      if (selectedFile) {
+        formDataToSend.append('profileImage', selectedFile);
+      }
+      
       const response = await axios.put(
         `${API_BASE}/auth/profile`,
-        formData,
-        { headers: authHeaders(token) }
+        formDataToSend,
+        { 
+          headers: {
+            ...authHeaders(token),
+            'Content-Type': 'multipart/form-data'
+          }
+        }
       );
+      
       if (response.data.success) {
-        const updatedUser = { ...user, ...formData };
+        const updatedUser = response.data.user;
         login(token, updatedUser);
+        fetchProfile();
         toast.success("Profile updated successfully!");
         setIsEditing(false);
+        setSelectedFile(null);
+        setPreviewImage(null);
       }
     } catch (error) {
+      console.error("Profile update error:", error);
       toast.error(error?.response?.data?.message || "Failed to update profile");
     } finally {
       setLoading(false);
@@ -70,12 +133,56 @@ const MerchantProfile = () => {
         {/* Profile Card */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-sm p-6 text-center">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">
-              {user?.name?.charAt(0).toUpperCase() || "M"}
+            <div className="relative inline-block mb-4">
+              {previewImage || profileData?.profileImage ? (
+                <img
+                  src={previewImage || profileData.profileImage}
+                  alt="Profile"
+                  className="w-32 h-32 rounded-full object-cover border-4 border-blue-100"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold">
+                  {profileData?.name?.charAt(0).toUpperCase() || user?.name?.charAt(0).toUpperCase() || "M"}
+                </div>
+              )}
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg"
+                  title="Change profile picture"
+                >
+                  <FaCamera />
+                </button>
+              )}
             </div>
-            <h3 className="text-xl font-semibold">{user?.name}</h3>
-            <p className="text-gray-500">{user?.email}</p>
+            
+            {isEditing && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            )}
+            
+            {previewImage && isEditing && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="text-xs text-red-600 hover:text-red-800 mt-2"
+              >
+                Remove image
+              </button>
+            )}
+            
+            <h3 className="text-xl font-semibold">{profileData?.name || user?.name}</h3>
+            <p className="text-gray-500">{profileData?.email || user?.email}</p>
             <p className="text-sm text-blue-600 mt-2">Merchant</p>
+            {profileData?.businessName && (
+              <p className="text-sm text-gray-600 mt-1">{profileData.businessName}</p>
+            )}
           </div>
         </div>
 
@@ -87,17 +194,32 @@ const MerchantProfile = () => {
               {!isEditing ? (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
                 >
+                  <FaUser className="text-sm" />
                   Edit Profile
                 </button>
               ) : (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setIsEditing(false)}
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setSelectedFile(null);
+                      setPreviewImage(null);
+                      fetchProfile();
+                    }}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
                   >
                     Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <AiOutlineUpload className="text-lg" />
+                    {loading ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
               )}
@@ -194,13 +316,9 @@ const MerchantProfile = () => {
               </div>
 
               {isEditing && (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                >
-                  {loading ? "Saving..." : "Save Changes"}
-                </button>
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-gray-600 mb-2">💡 Click the camera icon on your profile picture to upload a photo</p>
+                </div>
               )}
             </form>
           </div>

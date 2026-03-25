@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { SITE_NAME } from "../../config/site";
 import { BsCalendarEvent, BsInbox } from "react-icons/bs";
-import { FiBell, FiSearch, FiChevronDown } from "react-icons/fi";
+import { FiBell, FiSearch, FiChevronDown, FiUser, FiSettings, FiLogOut } from "react-icons/fi";
 import useAuth from "../../context/useAuth";
 import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import axios from "axios";
 import { API_BASE, authHeaders } from "../../lib/http";
+import useNotificationBadges from "../../context/useNotificationBadges";
 
 const MerchantTopbar = ({ onToggleSidebar }) => {
   const [open, setOpen] = useState(false);
@@ -15,8 +16,10 @@ const MerchantTopbar = ({ onToggleSidebar }) => {
   const navigate = useNavigate();
   const name = user?.name || "Merchant";
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  
+  // Use notification badge hook for consistent counts
+  const { badgeCounts, refreshBadges } = useNotificationBadges();
   
   // Refs for click outside detection
   const profileRef = useRef(null);
@@ -52,11 +55,10 @@ const MerchantTopbar = ({ onToggleSidebar }) => {
       });
       const notifs = response.data.notifications || [];
       setNotifications(notifs.slice(0, 5)); // Get latest 5 for dropdown
-      setUnreadCount(notifs.filter(n => !n.read).length);
+      // Use badge count from hook instead of calculating locally
     } catch (error) {
       console.error("Failed to load notifications:", error);
       setNotifications([]);
-      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -93,10 +95,10 @@ const MerchantTopbar = ({ onToggleSidebar }) => {
               }}
             >
               <FiBell />
-              {/* Notification badge */}
-              {unreadCount > 0 && (
+              {/* Notification badge - use badgeCounts.total from hook */}
+              {badgeCounts.total > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                  {badgeCounts.total > 9 ? '9+' : badgeCounts.total}
                 </span>
               )}
             </button>
@@ -178,15 +180,16 @@ const MerchantTopbar = ({ onToggleSidebar }) => {
                 style={{ zIndex: 9999 }}
               >
                 <button onClick={() => { setOpen(false); navigate("/dashboard/merchant/profile"); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2">
-                  <FiSearch className="text-gray-500" />
+                  <FiUser className="text-gray-500" />
                   Profile
                 </button>
                 <button onClick={() => { setOpen(false); navigate("/dashboard/merchant/settings"); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2">
-                  <FiBell className="text-gray-500" />
+                  <FiSettings className="text-gray-500" />
                   Settings
                 </button>
                 <hr className="my-1" />
-                <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600">
+                <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600 flex items-center gap-2">
+                  <FiLogOut className="text-red-600" />
                   Logout
                 </button>
               </div>

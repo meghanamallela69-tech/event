@@ -35,6 +35,7 @@ import MerchantNotifications from "./pages/dashboards/MerchantNotifications";
 import MerchantAnalytics from "./pages/dashboards/MerchantAnalytics";
 import MerchantTicketValidation from "./pages/dashboards/MerchantTicketValidation";
 import MerchantMarketing from "./pages/dashboards/MerchantMarketing";
+import MerchantEarnings from "./pages/dashboards/MerchantEarnings";
 import MerchantEvents from "./pages/dashboards/MerchantEvents";
 import MerchantCreateEvent from "./pages/dashboards/MerchantCreateEvent";
 import MerchantEditEvent from "./pages/dashboards/MerchantEditEvent";
@@ -42,6 +43,8 @@ import MerchantBookings from "./pages/dashboards/MerchantBookings";
 import MerchantPayments from "./pages/dashboards/MerchantPayments";
 import MerchantProfile from "./pages/dashboards/MerchantProfile";
 import MerchantSettings from "./pages/dashboards/MerchantSettings";
+import MerchantCategories from "./pages/dashboards/MerchantCategories";
+import UserPayments from "./pages/dashboards/UserPayments";
 
 import AdminMerchants from "./pages/dashboards/AdminMerchants";
 import AdminUsers from "./pages/dashboards/AdminUsers";
@@ -53,6 +56,8 @@ import AdminSettings from "./pages/dashboards/AdminSettings";
 import AdminCategories from "./pages/dashboards/AdminCategories";
 import AdminPayments from "./pages/dashboards/AdminPayments";
 import AdminServices from "./pages/dashboards/AdminServices";
+import AdminAuditLogs from "./pages/dashboards/AdminAuditLogs";
+import AdminComplaints from "./pages/dashboards/AdminComplaints";
 
 const AppContent = () => {
   const location = useLocation();
@@ -148,6 +153,17 @@ const AppContent = () => {
               <PrivateRoute>
                 <RoleRoute role="user">
                   <UserNotifications />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/user/payments"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="user">
+                  <UserPayments />
                 </RoleRoute>
               </PrivateRoute>
             }
@@ -286,6 +302,72 @@ const AppContent = () => {
             }
           />
 
+          <Route
+            path="/dashboard/admin/audit-logs"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminAuditLogs />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/complaints"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminComplaints />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/analytics"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminAnalytics />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/profile"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminProfile />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/notifications"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminNotifications />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/settings"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminSettings />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
           {/* MERCHANT DASHBOARD */}
           <Route
             path="/dashboard/merchant"
@@ -343,6 +425,17 @@ const AppContent = () => {
           />
 
           <Route
+            path="/dashboard/merchant/earnings"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantEarnings />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/dashboard/merchant/payments"
             element={
               <PrivateRoute>
@@ -370,6 +463,17 @@ const AppContent = () => {
               <PrivateRoute>
                 <RoleRoute role="merchant">
                   <MerchantSettings />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/merchant/categories"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantCategories />
                 </RoleRoute>
               </PrivateRoute>
             }

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import useAuth from "../../context/useAuth";
 import UserLayout from "../../components/user/UserLayout";
 import SummaryCard from "../../components/admin/SummaryCard";
-import { BsCalendar2Event, BsBookmarkHeart } from "react-icons/bs";
+import { BsCalendar2Event, BsBookmarkHeart, BsSearch } from "react-icons/bs";
 import { FaTicketAlt, FaBell, FaCalendarCheck, FaMapMarkerAlt, FaEye } from "react-icons/fa";
 import { API_BASE, authHeaders } from "../../lib/http";
 
@@ -15,6 +15,10 @@ const UserDashboard = () => {
   const [events, setEvents] = useState([]);
   const [savedEvents, setSavedEvents] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [recentBookings, setRecentBookings] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Load saved events from localStorage
   const loadSavedEvents = useCallback(() => {
@@ -31,6 +35,13 @@ const UserDashboard = () => {
       const bookingsRes = await axios.get(`${API_BASE}/bookings/my-bookings`, { headers });
       const bookings = bookingsRes.data.bookings || [];
       setRegistrations(bookings); // Using same state variable for consistency
+      
+      // Get recent bookings for dashboard (limit 3)
+      const recentBookingsRes = await axios.get(`${API_BASE}/events/recent-bookings`, { 
+        headers,
+        params: { limit: 3 }
+      });
+      setRecentBookings(recentBookingsRes.data.bookings || []);
       
       // Extract events from bookings - create event-like objects from booking data
       const eventsFromBookings = bookings.map(booking => ({
@@ -60,6 +71,35 @@ const UserDashboard = () => {
     }
   }, [token]);
 
+  // Search events by keyword
+  const handleSearch = useCallback(async (query) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const headers = authHeaders(token);
+      const response = await axios.get(`${API_BASE}/events/search`, {
+        headers,
+        params: { keyword: query }
+      });
+      
+      if (response.data.success) {
+        setSearchResults(response.data.events || []);
+      }
+    } catch (error) {
+      console.error("Search failed:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     loadData();
     loadSavedEvents();
@@ -71,10 +111,6 @@ const UserDashboard = () => {
     saved: savedEvents.length,
     notifications: notifications.length,
   };
-
-  const recentBookings = [...registrations]
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-    .slice(0, 4);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -105,137 +141,187 @@ const UserDashboard = () => {
         <p className="text-gray-600 mt-1">Here is an overview of your activity today</p>
       </section>
 
+      {/* Search Bar */}
+      <section className="mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3">
+            <BsSearch className="text-gray-400 text-xl" />
+            <input
+              type="text"
+              placeholder="Search events by name, category, or location..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="flex-1 outline-none text-gray-700 text-base"
+            />
+            {isSearching && (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            )}
+          </div>
+        </div>
+
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div className="mt-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Search Results ({searchResults.length})
+              </h3>
+            </div>
+            <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+              {searchResults.map((event) => (
+                <div
+                  key={event._id}
+                  className="p-4 hover:bg-gray-50 cursor-pointer transition"
+                  onClick={() => navigate(`/dashboard/user/events/${event._id}`)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">{event.title}</h4>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <BsCalendar2Event className="text-blue-500" />
+                          {new Date(event.date).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FaMapMarkerAlt className="text-red-500" />
+                          {event.location || "TBD"}
+                        </span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                          {event.category}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-blue-600">
+                        {event.price 
+                          ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(event.price)
+                          : "Free"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Recent Bookings Table */}
+      <section className="mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-800">Recent Bookings</h3>
+            <button 
+              onClick={() => navigate("/dashboard/user/bookings")}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View All
+            </button>
+          </div>
+          
+          {recentBookings.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <FaTicketAlt className="mx-auto text-4xl text-gray-300 mb-3" />
+              <p>No recent bookings found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Booking ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Event Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Quantity
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {recentBookings.map((booking) => {
+                    const statusColor = getStatusColor(booking.eventDate);
+                    return (
+                      <tr 
+                        key={booking._id}
+                        className="hover:bg-gray-50 cursor-pointer transition"
+                        onClick={() => navigate(`/dashboard/user/bookings`)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-600 font-mono">
+                            #{booking._id.slice(-6).toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {booking.eventImage && (
+                              <img 
+                                src={booking.eventImage} 
+                                alt={booking.serviceTitle}
+                                className="h-10 w-10 rounded-full object-cover mr-3"
+                              />
+                            )}
+                            <span className="text-sm font-medium text-gray-900">
+                              {booking.serviceTitle}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 capitalize">
+                            {booking.eventType || booking.serviceCategory || "Event"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {formatDate(booking.eventDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {booking.quantity || booking.guestCount || booking.selectedTickets 
+                            ? Object.values(booking.selectedTickets || {}).reduce((sum, qty) => sum + qty, 0) || 1
+                            : 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {booking.totalPrice 
+                              ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(booking.totalPrice)
+                              : "Free"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColor.bg} ${statusColor.text}`}>
+                            {statusColor.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Summary Cards - Side by Side (4 per row) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="mb-8">
         <SummaryCard title="Total Bookings" value={stats.bookings} icon={FaTicketAlt} color="bg-blue-600" />
         <SummaryCard title="Upcoming Events" value={stats.upcoming} icon={BsCalendar2Event} color="bg-emerald-600" />
         <SummaryCard title="Saved Events" value={stats.saved} icon={BsBookmarkHeart} color="bg-pink-600" />
         <SummaryCard title="Notifications" value={stats.notifications} icon={FaBell} color="bg-amber-600" />
       </div>
-
-      {/* My Bookings - Card Style Side by Side */}
-      <section className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">My Bookings</h3>
-          <button 
-            onClick={() => navigate("/dashboard/user/bookings")}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            View All
-          </button>
-        </div>
-        
-        {recentBookings.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-sm border">
-            <FaTicketAlt className="mx-auto text-4xl text-gray-300 mb-3" />
-            <p className="text-gray-500">No bookings yet</p>
-            <button 
-              onClick={() => navigate("/dashboard/user/browse")}
-              className="mt-3 text-blue-600 hover:underline text-sm"
-            >
-              Browse Events
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-            {recentBookings.map((booking) => {
-              const status = getStatusColor(booking.eventDate);
-              
-              // Get image - prioritize real event image, then category-based fallback
-              const getEventImage = (booking) => {
-                // First, try to use the real event image
-                if (booking.eventImage) {
-                  return booking.eventImage;
-                }
-                
-                // Fallback to category-based images
-                const categoryImages = {
-                  "Wedding": "/wedding.jpg",
-                  "Party": "/party.jpg",
-                  "Music": "/party.jpg",
-                  "Conference": "/gamenight.jpg",
-                  "Food": "/restaurant.jpg",
-                  "Tech": "/gamenight.jpg",
-                  "Outdoor": "/camping.jpg",
-                  "Birthday": "/birthday.jpg",
-                  "Anniversary": "/anniversary.jpg"
-                };
-                
-                if (booking.serviceCategory && categoryImages[booking.serviceCategory]) {
-                  return categoryImages[booking.serviceCategory];
-                }
-                
-                // Fallback based on title keywords
-                const title = (booking.serviceTitle || "").toLowerCase();
-                if (title.includes("wedding") || title.includes("marriage")) return "/wedding.jpg";
-                if (title.includes("music") || title.includes("concert") || title.includes("band")) return "/party.jpg";
-                if (title.includes("party") || title.includes("celebration")) return "/party.jpg";
-                if (title.includes("birthday")) return "/birthday.jpg";
-                if (title.includes("conference") || title.includes("meeting")) return "/gamenight.jpg";
-                if (title.includes("food") || title.includes("dinner")) return "/restaurant.jpg";
-                if (title.includes("outdoor") || title.includes("camping")) return "/camping.jpg";
-                if (title.includes("anniversary")) return "/anniversary.jpg";
-                
-                // Default fallback
-                return "/party.jpg";
-              };
-              
-              const eventImage = getEventImage(booking);
-              
-              return (
-                <div 
-                  key={booking._id} 
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer"
-                  onClick={() => navigate(`/dashboard/user/bookings`)}
-                >
-                  {/* Card Header with Event Image */}
-                  <div className="relative h-32 overflow-hidden">
-                    <img 
-                      src={eventImage} 
-                      alt={booking.serviceTitle || "Event"}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <h4 className="text-white font-semibold text-base truncate">{booking.serviceTitle || "Event"}</h4>
-                      <p className="text-white/80 text-xs">{booking.serviceCategory || "Event"}</p>
-                    </div>
-                    {/* Status Badge on Image */}
-                    <span className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${status.bg} ${status.text}`}>
-                      {status.label}
-                    </span>
-                  </div>
-                  
-                  {/* Card Body */}
-                  <div className="p-3 space-y-2">
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
-                      <FaCalendarCheck className="text-blue-500 flex-shrink-0" />
-                      <span>{formatDate(booking.eventDate)}{booking.eventTime ? ` at ${booking.eventTime}` : ""}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
-                      <FaMapMarkerAlt className="text-red-500 flex-shrink-0" />
-                      <span className="truncate">{booking.location || "Location TBD"}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <span className="text-sm font-semibold text-blue-600">
-                        {booking.totalPrice 
-                          ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(booking.totalPrice)
-                          : "Free"}
-                      </span>
-                      <button className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm">
-                        <FaEye className="text-xs" />
-                        View Details
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
 
       {/* Notifications Section */}
       {notifications.length > 0 && (

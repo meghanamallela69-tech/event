@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../context/useAuth";
@@ -56,6 +56,8 @@ const MerchantCreateEvent = () => {
   const navigate = useNavigate();
   const [eventType, setEventType] = useState(null); // null = show modal
   const [loading, setLoading] = useState(false);
+  const [merchantCategories, setMerchantCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -91,6 +93,26 @@ const MerchantCreateEvent = () => {
     setAddons((p) => p.map((a, idx) => idx === i ? { ...a, [field]: value } : a));
   const handleAddonPreset = (i, name) =>
     setAddons((p) => p.map((a, idx) => idx === i ? { ...a, name } : a));
+
+  // Fetch merchant categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const response = await axios.get(`${API_BASE}/api/v1/categories`, {
+          headers: authHeaders(token),
+        });
+        if (response.data.success) {
+          setMerchantCategories(response.data.categories);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, [token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -280,10 +302,19 @@ const MerchantCreateEvent = () => {
                   className="w-full border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select category</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
+                  {loadingCategories ? (
+                    <option disabled>Loading categories...</option>
+                  ) : merchantCategories.length > 0 ? (
+                    merchantCategories.map((cat) => (
+                      <option key={cat._id} value={cat.name}>{cat.name}</option>
+                    ))
+                  ) : (
+                    <option disabled>No categories available</option>
+                  )}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Don't see your category? <a href="/dashboard/merchant/categories" target="_blank" className="text-blue-600 hover:underline">Create one</a>
+                </p>
               </div>
 
               {eventType !== "ticketed" && (

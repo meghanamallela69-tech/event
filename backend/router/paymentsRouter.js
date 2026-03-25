@@ -7,7 +7,9 @@ import {
   processBookingRefund,
   getPaymentStatistics,
   getMerchantEarnings,
-  getAllPayments
+  getAllPayments,
+  getUserPayments,
+  getPaymentDetails
 } from "../controller/paymentController.js";
 import { auth } from "../middleware/authMiddleware.js";
 import { ensureRole } from "../middleware/roleMiddleware.js";
@@ -28,6 +30,10 @@ router.post("/booking/:bookingId/pay-ticket", auth, payForTicket);
 router.post("/booking/:bookingId/pay", auth, processPayment);
 router.get("/user/bookings", auth, getUserBookings);
 router.get("/booking/:bookingId", auth, getBookingForPayment);
+
+// User payments routes
+router.get("/user/my-payments", auth, getUserPayments); // Get user's payments with filter
+router.get("/details/:paymentId", auth, getPaymentDetails); // Get payment details/receipt
 
 // Refund routes
 router.post("/booking/:bookingId/refund", auth, processBookingRefund);

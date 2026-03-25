@@ -5,15 +5,21 @@ import { FaBell, FaTrash, FaCheck, FaInbox, FaCalendarAlt, FaDollarSign } from "
 import { API_BASE, authHeaders } from "../../lib/http";
 import { toast } from "react-hot-toast";
 import useAuth from "../../context/useAuth";
+import useNotificationBadges from "../../context/useNotificationBadges";
 
 const MerchantNotifications = () => {
   const { token } = useAuth();
+  const { markAllAsRead: markAllReadFromHook } = useNotificationBadges();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadNotifications();
-  }, [token]);
+    // Mark all notifications as read when viewing the page (only once)
+    setTimeout(() => {
+      markAllReadFromHook();
+    }, 500);
+  }, []);
 
   const loadNotifications = async () => {
     try {

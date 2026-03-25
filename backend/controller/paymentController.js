@@ -575,3 +575,137 @@ export const getAllPayments = async (req, res) => {
     });
   }
 };
+
+// Get user's payments with optional status filter
+export const getUserPayments = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { status } = req.query; // Optional filter: all, completed, pending, failed
+    
+    console.log(`=== GET USER PAYMENTS ===`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Status Filter: ${status || 'all'}`);
+    
+    // Build query - use userId directly as MongoDB handles string ObjectIds
+    const query = { userId };
+    
+    // Add status filter if provided
+    if (status && status !== 'all') {
+      if (['success', 'pending', 'failed', 'refunded'].includes(status)) {
+        query.paymentStatus = status;
+      }
+    }
+    
+    // Fetch payments and populate related data
+    const payments = await Payment.find(query)
+      .populate('eventId', 'title eventType')
+      .populate('bookingId', 'serviceTitle serviceCategory eventDate')
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to 100 most recent
+    
+    console.log(`Found ${payments.length} payments for user ${userId}`);
+    
+    // Enhance payments with event/booking data
+    const enhancedPayments = payments.map(payment => {
+      const paymentObj = payment.toObject();
+      
+      // Extract event name and type from populated data
+      if (paymentObj.eventId) {
+        paymentObj.eventName = paymentObj.eventId.title;
+        paymentObj.eventType = paymentObj.eventId.eventType;
+      } else if (paymentObj.bookingId) {
+        paymentObj.eventName = paymentObj.bookingId.serviceTitle;
+        paymentObj.eventType = paymentObj.bookingId.serviceCategory;
+      }
+      
+      return paymentObj;
+    });
+    
+    return res.status(200).json({
+      success: true,
+      payments: enhancedPayments,
+      count: enhancedPayments.length
+    });
+    
+  } catch (error) {
+    console.error("Get user payments error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user payments",
+      error: error.message
+    });
+  }
+};
+
+// Get payment details by payment ID
+export const getPaymentDetails = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const userId = req.user.userId;
+    
+    console.log(`=== GET PAYMENT DETAILS ===`);
+    console.log(`Payment ID: ${paymentId}`);
+    console.log(`User ID: ${userId}`);
+    
+    // Find payment and verify ownership
+    const payment = await Payment.findOne({ 
+      _id: paymentId,
+      userId
+    })
+    .populate('eventId')
+    .populate('merchantId', 'name email')
+    .populate('bookingId');
+    
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found or access denied"
+      });
+    }
+    
+    console.log(`Found payment for booking: ${payment.bookingId?._id}`);
+    
+    // Get booking details if available
+    let bookingDetails = null;
+    if (payment.bookingId) {
+      bookingDetails = await Booking.findById(payment.bookingId._id)
+        .populate('serviceId');
+    }
+    
+    // Get event details if available
+    let eventDetails = null;
+    if (payment.eventId) {
+      eventDetails = await Event.findById(payment.eventId._id);
+    }
+    
+    // Build receipt data
+    const receiptData = {
+      payment: payment.toObject(),
+      booking: bookingDetails ? bookingDetails.toObject() : null,
+      event: eventDetails ? eventDetails.toObject() : null,
+      merchant: payment.merchantId,
+      formattedData: {
+        transactionId: payment.transactionId,
+        amount: new Intl.NumberFormat('en-IN', { 
+          style: 'currency', 
+          currency: 'INR' 
+        }).format(payment.totalAmount),
+        date: new Date(payment.createdAt).toLocaleString('en-IN'),
+        status: payment.paymentStatus.toUpperCase()
+      }
+    };
+    
+    return res.status(200).json({
+      success: true,
+      payment: receiptData
+    });
+    
+  } catch (error) {
+    console.error("Get payment details error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch payment details",
+      error: error.message
+    });
+  }
+};

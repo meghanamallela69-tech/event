@@ -47,6 +47,25 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    address: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    bio: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 500,
+    },
+    profileImage: {
+      type: String,
+      default: "",
+    },
+    profileImagePublicId: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

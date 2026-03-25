@@ -1,6 +1,13 @@
 import express from "express";
 import { Notification } from "../models/notificationSchema.js";
 import { auth } from "../middleware/authMiddleware.js";
+import {
+  getUnreadCounts,
+  markAllAsRead,
+  markAsRead,
+  getRecentNotifications,
+  markBookingNotificationsAsRead
+} from "../controller/notificationController.js";
 
 const router = express.Router();
 
@@ -15,6 +22,21 @@ router.get("/", auth, async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+// Get unread counts
+router.get("/unread-counts", auth, getUnreadCounts);
+
+// Mark all as read
+router.post("/mark-all-read", auth, markAllAsRead);
+
+// Mark specific notification as read
+router.patch("/:notificationId/read", auth, markAsRead);
+
+// Get recent notifications
+router.get("/recent", auth, getRecentNotifications);
+
+// Mark booking notifications as read
+router.post("/mark-booking-read", auth, markBookingNotificationsAsRead);
 
 // Mark notification as read
 router.patch("/:id/read", auth, async (req, res) => {

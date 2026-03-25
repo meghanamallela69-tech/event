@@ -6,6 +6,9 @@ import authRouter from "./router/authRouter.js";
 import eventRouter from "./router/eventRouter.js";
 import merchantRouter from "./router/merchantRouter.js";
 import adminRouter from "./router/adminRouter.js";
+import adminManagementRouter from "./router/adminManagementRouter.js";
+import adminProfileRouter from "./router/adminProfileRouter.js";
+import adminSettingsRouter from "./router/adminSettingsRouter.js";
 import bookingRouter from "./router/bookingRouter.js";
 import serviceRouter from "./router/serviceRouter.js";
 import paymentsRouter from "./router/paymentsRouter.js";
@@ -16,6 +19,7 @@ import couponRouter from "./router/couponRouter.js";
 import followRouter from "./router/followRouter.js";
 import marketingRouter from "./router/marketingRouter.js";
 import analyticsRouter from "./router/analyticsRouter.js";
+import categoryRouter from "./router/categoryRouter.js";
 import cors from "cors";
 import { ensureAdmin } from "./util/ensureAdmin.js";
 
@@ -25,9 +29,29 @@ dotenv.config({ path: "./config/config.env" });
 
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: function(origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Allowed origins
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://192.168.1.16:5173'
+      ];
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
   })
 );
 
@@ -39,6 +63,9 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/events", eventRouter);
 app.use("/api/v1/merchant", merchantRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/admin-management", adminManagementRouter);
+app.use("/api/v1/admin-profile", adminProfileRouter);
+app.use("/api/v1/admin-settings", adminSettingsRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/services", serviceRouter);
 app.use("/api/v1/payments", paymentsRouter);
@@ -49,6 +76,7 @@ app.use("/api/v1/coupons", couponRouter);
 app.use("/api/v1/follow", followRouter);
 app.use("/api/v1/marketing", marketingRouter);
 app.use("/api/v1/analytics", analyticsRouter);
+app.use("/api/v1/categories", categoryRouter);
 
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({ status: "ok" });

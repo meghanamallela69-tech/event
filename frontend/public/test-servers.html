@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+        .status.error {
+            border-left-color: #f44336;
+        }
+        .status.loading {
+            border-left-color: #ff9800;
+        }
+        .icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        button.danger {
+            background: #f44336;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🚀 Server Status Check</h1>
+        <p style="text-align: center; opacity: 0.8;">Testing connection to backend and frontend servers</p>
+        
+        <div id="frontend-status" class="status loading">
+            <span><span class="icon">⏳</span> Frontend Server (Port 5173)</span>
+            <span>Checking...</span>
+        </div>
+        
+        <div id="backend-status" class="status loading">
+            <span><span class="icon">⏳</span> Backend Server (Port 5000)</span>
+            <span>Checking...</span>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="testServers()">🔄 Test Again</button>
+            <button class="danger" onclick="clearCache()">🗑️ Clear Cache & Reload</button>
+        </div>
+        
+        <div id="results" style="margin-top: 30px;"></div>
+    </div>
+
+    <script>
+        async function testServers() {
+            const frontendStatus = document.getElementById('frontend-status');
+            const backendStatus = document.getElementById('backend-status');
+            const results = document.getElementById('results');
+            
+            // Test Frontend
+            frontendStatus.className = 'status loading';
+            frontendStatus.innerHTML = '<span><span class="icon">⏳</span> Frontend Server (Port 5173)</span><span>Checking...</span>';
+            
+            try {
+                const response = await fetch('http://localhost:5173', { method: 'HEAD' });
+                if (response.ok) {
+                    frontendStatus.className = 'status';
+                    frontendStatus.innerHTML = '<span><span class="icon">✅</span> Frontend Server (Port 5173)</span><span>Running</span>';
+                } else {
+                    throw new Error('Not OK');
+                }
+            } catch (error) {
+                frontendStatus.className = 'status error';
+                frontendStatus.innerHTML = '<span><span class="icon">❌</span> Frontend Server (Port 5173)</span><span>Not Accessible</span>';
+            }
+            
+            // Test Backend
+            backendStatus.className = 'status loading';
+            backendStatus.innerHTML = '<span><span class="icon">⏳</span> Backend Server (Port 5000)</span><span>Checking...</span>';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/v1/health', { 
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await response.json();
+                
+                if (response.status === 200) {
+                    backendStatus.className = 'status';
+                    backendStatus.innerHTML = '<span><span class="icon">✅</span> Backend Server (Port 5000)</span><span>Running</span>';
+                    
+                    results.innerHTML = `
+                        <h3>✅ All Servers Running Successfully!</h3>
+                        <p style="margin-top: 10px; opacity: 0.9;">Both servers are operational and ready to use.</p>
+                        <pre>Health Status: ${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error('Backend not responding correctly');
+                }
+            } catch (error) {
+                backendStatus.className = 'status error';
+                backendStatus.innerHTML = '<span><span class="icon">❌</span> Backend Server (Port 5000)</span><span>Error: ' + error.message + '</span>';
+                results.innerHTML = `<p style="color: #ff6b6b;">Error: ${error.message}<br>Make sure the backend server is running.</p>`;
+            }
+        }
+        
+        function clearCache() {
+            localStorage.clear();
+            sessionStorage.clear();
+            alert('Cache cleared! The page will now reload.');
+            window.location.reload(true);
+        }
+        
+        // Auto-test on page load
+        window.onload = () => {
+            setTimeout(testServers, 500);
+        };
+    </script>
+</body>
+</html>
