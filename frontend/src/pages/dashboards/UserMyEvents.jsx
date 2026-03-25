@@ -150,8 +150,12 @@ const UserMyEvents = () => {
       );
     }
 
-    // Rate button for completed bookings without rating
-    if (status === "completed" && !booking.rating?.score && isPast) {
+    // Rate button for completed/paid bookings without rating
+    // Show for ticketed events when paid, for full-service when completed
+    const canRate = (booking.eventType === "ticketed" && ["paid", "confirmed", "completed"].includes(status)) ||
+                    (booking.eventType === "full-service" && status === "completed");
+    
+    if (canRate && !booking.rating?.score) {
       buttons.push(
         <button
           key="rate"

@@ -19,7 +19,24 @@
 - [MONGODB_ATLAS_PERMANENT_SOLUTION.md](file://backend/MONGODB_ATLAS_PERMANENT_SOLUTION.md)
 - [DATABASE_TROUBLESHOOTING.md](file://backend/DATABASE_TROUBLESHOOTING.md)
 - [DATABASE_SETUP.md](file://backend/DATABASE_SETUP.md)
+- [migrate-to-atlas.js](file://backend/migrate-to-atlas.js)
+- [populate-atlas-database.js](file://backend/populate-atlas-database.js)
+- [sync-local-to-atlas.js](file://backend/sync-local-to-atlas.js)
+- [fix-atlas-dns-permanent.ps1](file://backend/fix-atlas-dns-permanent.ps1)
+- [fix-dns-windows.bat](file://backend/fix-dns-windows.bat)
+- [test-atlas-connection.js](file://backend/test-atlas-connection.js)
+- [app.js](file://backend/app.js)
+- [server.js](file://backend/server.js)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced database design documentation to reflect comprehensive MongoDB Atlas integration
+- Added detailed coverage of production-ready database configuration procedures
+- Expanded data migration procedures with concrete scripts and workflows
+- Documented permanent DNS configuration solutions for reliable Atlas connectivity
+- Updated troubleshooting guides with comprehensive connection testing procedures
+- Integrated modern connection strategies with fallback mechanisms
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -29,20 +46,27 @@
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Dependency Analysis](#dependency-analysis)
 7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+8. [Production-Ready Database Configuration](#production-ready-database-configuration)
+9. [Comprehensive Data Migration Procedures](#comprehensive-data-migration-procedures)
+10. [Advanced Troubleshooting and Diagnostics](#advanced-troubleshooting-and-diagnostics)
+11. [Conclusion](#conclusion)
+12. [Appendices](#appendices)
 
 ## Introduction
-This document provides comprehensive database design documentation for the MERN Stack Event Management Platform. It focuses on MongoDB schema design, entity relationships, and data modeling decisions across the collections used by the backend. It also covers indexing strategies, query optimization, database connection management, MongoDB Atlas configuration, and migration procedures. The goal is to enable developers and stakeholders to understand how data is structured, how entities relate, and how to maintain and scale the database effectively.
+This document provides comprehensive database design documentation for the MERN Stack Event Management Platform, focusing on MongoDB schema design, entity relationships, and data modeling decisions. The platform now features enhanced MongoDB Atlas integration with production-ready configuration, comprehensive data migration procedures, and robust connection management strategies. The documentation covers MongoDB Atlas setup, permanent DNS configuration solutions, automated data migration scripts, and advanced troubleshooting procedures to ensure reliable database operations in production environments.
 
 ## Project Structure
-The database layer is organized around Mongoose models under the models directory and a centralized connection module under database. The connection module configures robust connectivity to MongoDB Atlas with multiple fallback strategies and DNS overrides to improve reliability. Supporting documentation files guide Atlas setup, permanent solutions, and troubleshooting.
+The database layer is organized around Mongoose models under the models directory and a sophisticated connection module under database. The enhanced connection module implements multiple fallback strategies for MongoDB Atlas connectivity, including forced DNS resolution and manual SRV record handling. Comprehensive supporting documentation and automation scripts provide complete lifecycle management from setup to migration and maintenance.
 
 ```mermaid
 graph TB
-subgraph "Database Layer"
-DC["dbConnection.js"]
+subgraph "Enhanced Database Layer"
+DC["dbConnection.js<br/>Multi-strategy Atlas Connection"]
+DNS["fix-atlas-dns-permanent.ps1<br/>Permanent DNS Configuration"]
+TEST["test-atlas-connection.js<br/>Connection Testing Suite"]
+MIG["migrate-to-atlas.js<br/>Data Migration Tool"]
+SYNC["sync-local-to-atlas.js<br/>Local-to-Atlas Sync"]
+POP["populate-atlas-database.js<br/>Sample Data Population"]
 US["userSchema.js"]
 ES["eventSchema.js"]
 BS["bookingSchema.js"]
@@ -68,123 +92,114 @@ DC --> NS
 DC --> PS
 DC --> REG
 DC --> MSG
+DNS --> DC
+TEST --> DC
+MIG --> DC
+SYNC --> DC
+POP --> DC
 ```
 
 **Diagram sources**
-- [dbConnection.js:19-94](file://backend/database/dbConnection.js#L19-L94)
-- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
-- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
-- [bookingSchema.js:3-50](file://backend/models/bookingSchema.js#L3-L50)
-- [serviceSchema.js:14-77](file://backend/models/serviceSchema.js#L14-L77)
-- [couponSchema.js:3-98](file://backend/models/couponSchema.js#L3-L98)
-- [followSchema.js:3-21](file://backend/models/followSchema.js#L3-L21)
-- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
-- [ratingSchema.js:3-23](file://backend/models/ratingSchema.js#L3-L23)
-- [notificationSchema.js:3-33](file://backend/models/notificationSchema.js#L3-L33)
-- [paymentSchema.js:3-109](file://backend/models/paymentSchema.js#L3-L109)
-- [registrationSchema.js:3-9](file://backend/models/registrationSchema.js#L3-L9)
-- [messageSchema.js:4-25](file://backend/models/messageSchema.js#L4-L25)
+- [dbConnection.js:19-112](file://backend/database/dbConnection.js#L19-L112)
+- [fix-atlas-dns-permanent.ps1:1-165](file://backend/fix-atlas-dns-permanent.ps1#L1-L165)
+- [test-atlas-connection.js:6-98](file://backend/test-atlas-connection.js#L6-L98)
+- [migrate-to-atlas.js:9-97](file://backend/migrate-to-atlas.js#L9-L97)
+- [sync-local-to-atlas.js:9-137](file://backend/sync-local-to-atlas.js#L9-L137)
+- [populate-atlas-database.js:10-263](file://backend/populate-atlas-database.js#L10-L263)
 
 **Section sources**
-- [dbConnection.js:19-94](file://backend/database/dbConnection.js#L19-L94)
-- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
-- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
-- [bookingSchema.js:3-50](file://backend/models/bookingSchema.js#L3-L50)
-- [serviceSchema.js:14-77](file://backend/models/serviceSchema.js#L14-L77)
-- [couponSchema.js:3-98](file://backend/models/couponSchema.js#L3-L98)
-- [followSchema.js:3-21](file://backend/models/followSchema.js#L3-L21)
-- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
-- [ratingSchema.js:3-23](file://backend/models/ratingSchema.js#L3-L23)
-- [notificationSchema.js:3-33](file://backend/models/notificationSchema.js#L3-L33)
-- [paymentSchema.js:3-109](file://backend/models/paymentSchema.js#L3-L109)
-- [registrationSchema.js:3-9](file://backend/models/registrationSchema.js#L3-L9)
-- [messageSchema.js:4-25](file://backend/models/messageSchema.js#L4-L25)
+- [dbConnection.js:19-112](file://backend/database/dbConnection.js#L19-L112)
+- [fix-atlas-dns-permanent.ps1:1-165](file://backend/fix-atlas-dns-permanent.ps1#L1-L165)
+- [test-atlas-connection.js:6-98](file://backend/test-atlas-connection.js#L6-L98)
+- [migrate-to-atlas.js:9-97](file://backend/migrate-to-atlas.js#L9-L97)
+- [sync-local-to-atlas.js:9-137](file://backend/sync-local-to-atlas.js#L9-L137)
+- [populate-atlas-database.js:10-263](file://backend/populate-atlas-database.js#L10-L263)
 
 ## Core Components
-This section documents each collection’s schema, fields, data types, validation rules, and relationships. It also highlights indexes and middleware that optimize queries and enforce data integrity.
+This section documents each collection's schema, fields, data types, validation rules, and relationships, with enhanced focus on production-ready configurations and comprehensive migration support.
 
 - Users
-  - Purpose: Store platform users, merchants, and admins with roles and statuses.
-  - Key fields: name, businessName, phone, serviceType, email, password, role, status.
-  - Validation: Name length, email format, password minimum length, role enum, status enum.
-  - Indexes: None declared in schema; consider unique index on email for fast lookups.
-  - Relationships: Referenced by Events (createdBy), Services (createdBy), Bookings, Coupons (createdBy), Reviews, Ratings, Notifications, Payments, Registrations.
+  - Purpose: Store platform users, merchants, and admins with roles and statuses
+  - Key fields: name, businessName, phone, serviceType, email, password, role, status
+  - Validation: Name length constraints, email format validation, password minimum length, role enum validation, status enum validation
+  - Indexes: Consider unique index on email for authentication and fast lookups
+  - Relationships: Primary creator of Events and Services; referenced by Bookings, Coupons, Reviews, Ratings, Notifications, Payments, Registrations
 
 - Events
-  - Purpose: Represent event listings with metadata, pricing, and images.
-  - Key fields: title, description, category, price, rating, images[], features[], createdBy.
-  - Validation: Rating bounds, images array presence.
-  - Indexes: None declared in schema; consider compound index on category + rating for analytics.
-  - Relationships: Created by a User; linked to Reviews and Ratings; optionally linked to Bookings via registration.
+  - Purpose: Represent event listings with comprehensive metadata, pricing, and ticket management
+  - Key fields: title, description, category, eventType (ticketed/full-service), price, location, date, time, duration, tickets, totalTickets, availableTickets, status, rating, images[], features[], createdBy
+  - Validation: Price validation, ticket quantity constraints, date/time validation, status enum, rating bounds
+  - Indexes: Compound index on category + status for filtering, date index for upcoming events
+  - Relationships: Created by User; linked to Bookings, Reviews, Ratings, Registrations
 
 - Bookings
-  - Purpose: Track booking requests for services with status and pricing.
-  - Key fields: user, serviceId, serviceTitle, serviceCategory, servicePrice, bookingDate, eventDate, notes, status, guestCount, totalPrice.
-  - Validation: Status enum, guestCount default, totalPrice numeric.
-  - Indexes: None declared in schema; consider indexes on user + createdAt, status, eventDate.
-  - Relationships: References User and Service; links to Payments and Notifications.
+  - Purpose: Track booking requests for events and services with comprehensive status tracking
+  - Key fields: user, merchant, type (event/service), eventType, eventId, eventTitle, eventCategory, eventPrice, serviceDate, serviceTime, bookingDate, guests, specialRequirements, status, totalPrice, paymentStatus, ticketType, ticketCount
+  - Validation: Status enum validation, guest count constraints, price validation, ticket type validation
+  - Indexes: Compound index on user + status, eventDate for scheduling, paymentStatus for financial tracking
+  - Relationships: References User and Merchant; links to Payments and Notifications
 
 - Services
-  - Purpose: List service offerings with rich metadata and searchability.
-  - Key fields: title, description, category, price, rating, images[], isActive, createdBy.
-  - Validation: Category enum, price min, rating bounds, images count, lengths.
-  - Indexes: Text index on title/description/category for full-text search.
-  - Relationships: Created by a User; referenced by Bookings and Payments.
+  - Purpose: List service offerings with rich metadata and comprehensive search capabilities
+  - Key fields: title, description, category, price, rating, images[], isActive, createdBy
+  - Validation: Category enum validation, price minimum constraints, rating bounds, image validation
+  - Indexes: Text index on title/description/category for full-text search, category index for filtering
+  - Relationships: Created by User; referenced by Bookings and Payments
 
 - Coupons
-  - Purpose: Discount management with usage limits, validity, and applicability rules.
-  - Key fields: code, discountType, discountValue, maxDiscount, minAmount, expiryDate, usageLimit, usedCount, isActive, description, createdBy, applicableEvents[], applicableCategories[], applicableUsers[], usageHistory[].
-  - Validation: Uppercase code, discount value min, expiry date, usage limits, counts.
-  - Indexes: Unique code, composite isActive + expiryDate, createdBy.
-  - Middleware: Pre-save uppercase code.
-  - Relationships: Created by a User; applicable to Events and Categories; tracks usage via Booking.
+  - Purpose: Advanced discount management with usage limits, validity, and applicability rules
+  - Key fields: code, discountType, discountValue, maxDiscount, minAmount, expiryDate, usageLimit, usedCount, isActive, description, createdBy, applicableEvents[], applicableCategories[], applicableUsers[], usageHistory[]
+  - Validation: Code uppercase enforcement, discount value constraints, expiry date validation, usage limit enforcement
+  - Indexes: Unique code index, composite (isActive + expiryDate), createdBy index
+  - Middleware: Pre-save code normalization to uppercase
+  - Relationships: Created by User; applicable to Events and Categories; tracks usage via Bookings
 
 - Follows
-  - Purpose: Track user-to-merchant follow relationships.
-  - Key fields: user, merchant.
-  - Validation: References User for both fields.
-  - Indexes: Unique compound index on user + merchant.
-  - Relationships: Both sides reference User.
+  - Purpose: Track user-to-merchant relationship management
+  - Key fields: user, merchant
+  - Validation: User reference validation for both fields
+  - Indexes: Unique compound index on user + merchant to prevent duplicates
+  - Relationships: Bidirectional relationship between Users
 
 - Reviews
-  - Purpose: Capture textual feedback per event.
-  - Key fields: user, event, rating, reviewText.
-  - Validation: Rating bounds, uniqueness constraint on user + event.
-  - Indexes: Unique compound index on user + event.
-  - Relationships: Links User and Event.
+  - Purpose: Capture detailed textual feedback per event with quality control
+  - Key fields: user, event, rating, reviewText
+  - Validation: Rating bounds validation, uniqueness constraint on user + event combination
+  - Indexes: Unique compound index on user + event to prevent duplicate reviews
+  - Relationships: Links User and Event with quality assurance
 
 - Ratings
-  - Purpose: Capture numerical ratings per event.
-  - Key fields: user, event, rating.
-  - Validation: Rating bounds, uniqueness constraint on user + event.
-  - Indexes: Unique compound index on user + event.
-  - Relationships: Links User and Event.
+  - Purpose: Capture numerical ratings per event for aggregation
+  - Key fields: user, event, rating
+  - Validation: Rating bounds validation, uniqueness constraint on user + event combination
+  - Indexes: Unique compound index on user + event to prevent duplicate ratings
+  - Relationships: Links User and Event for statistical analysis
 
 - Notifications
-  - Purpose: Store user-specific notifications with optional booking/event linkage.
-  - Key fields: user, message, read, eventId, bookingId, type.
-  - Validation: Enum for type, references for user and bookingId.
-  - Indexes: None declared in schema; consider indexes on user + createdAt, read.
-  - Relationships: Links User; optionally links Booking.
+  - Purpose: Store user-specific notifications with comprehensive categorization
+  - Key fields: user, message, read, eventId, bookingId, type (booking/payment/general)
+  - Validation: Type enum validation, user reference validation, booking reference validation
+  - Indexes: Compound index on user + createdAt for timeline, read status index for filtering
+  - Relationships: Links User; optionally links Booking for context
 
 - Payments
-  - Purpose: Record payment transactions, commissions, payouts, and refunds.
-  - Key fields: userId, merchantId, bookingId, eventId, totalAmount, adminCommission, merchantAmount, adminCommissionPercent, paymentStatus, paymentMethod, transactionId, paymentGateway, refund fields, merchant payout fields, currency, description, metadata.
-  - Validation: Amounts validated via pre-save middleware, enums for status and method, unique transactionId.
-  - Indexes: Composite indexes on userId/merchantId + createdAt, bookingId, transactionId, paymentStatus.
-  - Middleware: Pre-save amount validation.
-  - Relationships: Links User (userId, merchantId), Booking, Event.
+  - Purpose: Record comprehensive payment transactions with detailed financial tracking
+  - Key fields: userId, merchantId, bookingId, eventId, totalAmount, adminCommission, merchantAmount, adminCommissionPercent, paymentStatus, paymentMethod, transactionId, paymentGateway, refund fields, merchant payout fields, currency, description, metadata
+  - Validation: Amount validation via pre-save middleware, status/method enum validation, unique transactionId enforcement
+  - Indexes: Composite indexes on userId + createdAt, merchantId + createdAt, bookingId, transactionId, paymentStatus
+  - Middleware: Pre-save amount calculation and validation
+  - Relationships: Links User (userId, merchantId), Booking, Event for comprehensive financial tracking
 
 - Registrations
-  - Purpose: Track user registrations for events.
-  - Key fields: user, event.
-  - Relationships: Links User and Event.
+  - Purpose: Track user event attendance and participation
+  - Key fields: user, event
+  - Relationships: Links User and Event for attendance management
 
 - Messages
-  - Purpose: Store contact form submissions.
-  - Key fields: name, email, subject, message.
-  - Validation: Length and format checks.
-  - Relationships: No relational references.
+  - Purpose: Store contact form submissions with validation
+  - Key fields: name, email, subject, message
+  - Validation: Input length and format validation
+  - Relationships: No relational dependencies for simple contact management
 
 **Section sources**
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
@@ -201,33 +216,44 @@ This section documents each collection’s schema, fields, data types, validatio
 - [messageSchema.js:4-25](file://backend/models/messageSchema.js#L4-L25)
 
 ## Architecture Overview
-The database architecture centers on a single MongoDB Atlas cluster with a dedicated database name. The connection module implements three strategies to establish connectivity, including forced DNS resolution for SRV records and manual SRV resolution. Robust Mongoose options are applied for timeouts, pool sizing, write concerns, and retries. Collections are designed with explicit references and embedded arrays where appropriate, and indexes are strategically placed to support frequent queries.
+The enhanced database architecture centers on MongoDB Atlas with comprehensive fallback strategies and permanent DNS configuration. The connection module implements three robust connection methods: standard SRV URI with forced DNS resolution, manual SRV record resolution, and direct shard host connections. Production-ready configurations include detailed logging, connection monitoring, and comprehensive error handling with actionable troubleshooting guidance.
 
 ```mermaid
 graph TB
-Atlas["MongoDB Atlas Cluster"]
-Conn["dbConnection.js<br/>Multiple connection strategies"]
-Mongoose["Mongoose Options<br/>timeouts, pool, w, retryWrites"]
-Strategies["SRV URI<br/>Manual SRV Resolve<br/>Direct Shard Hosts"]
+Atlas["MongoDB Atlas Cluster<br/>cluster0.gfbrfcg.mongodb.net"]
+Conn["dbConnection.js<br/>Multi-strategy Connection Engine"]
+Mongoose["Mongoose Options<br/>Enhanced Timeout & Pool Settings"]
+DNS["Permanent DNS Configuration<br/>Google & Cloudflare DNS"]
+Strategies["Connection Strategy 1:<br/>SRV URI + Forced DNS"]
+Strategies2["Connection Strategy 2:<br/>Manual SRV Resolution"]
+Strategies3["Connection Strategy 3:<br/>Direct Shard Hosts"]
+Monitoring["Connection Monitoring<br/>Event Listeners & Logging"]
 Conn --> Strategies
+Conn --> Strategies2
+Conn --> Strategies3
 Strategies --> Atlas
+Strategies2 --> Atlas
+Strategies3 --> Atlas
 Conn --> Mongoose
 Mongoose --> Atlas
+DNS --> Conn
+Monitoring --> Conn
 ```
 
 **Diagram sources**
-- [dbConnection.js:19-94](file://backend/database/dbConnection.js#L19-L94)
+- [dbConnection.js:19-112](file://backend/database/dbConnection.js#L19-L112)
+- [fix-atlas-dns-permanent.ps1:18-35](file://backend/fix-atlas-dns-permanent.ps1#L18-L35)
 
 **Section sources**
-- [dbConnection.js:19-94](file://backend/database/dbConnection.js#L19-L94)
+- [dbConnection.js:19-112](file://backend/database/dbConnection.js#L19-L112)
+- [fix-atlas-dns-permanent.ps1:18-35](file://backend/fix-atlas-dns-permanent.ps1#L18-L35)
 
 ## Detailed Component Analysis
 
-### Users
-- Schema highlights: name, email (unique), password (select:false), role enum, status enum, optional business info.
-- Validation: Email format, password min length, role/status enums.
-- Indexes: Consider adding a unique index on email for fast lookups.
-- Relationships: Creator of Events, Services; referenced by Bookings, Coupons, Reviews, Ratings, Notifications, Payments, Registrations.
+### Enhanced Users Collection
+- Schema enhancements: Comprehensive role-based access control, business profile management, and enhanced validation
+- Production features: Unique email indexing, role-based security, business information tracking
+- Integration: Seamless relationship with all other collections for complete platform functionality
 
 ```mermaid
 erDiagram
@@ -252,11 +278,10 @@ timestamp updatedAt
 **Section sources**
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 
-### Events
-- Schema highlights: title, description, category, price, rating bounds, images array, features array, createdBy.
-- Validation: Rating min/max, images presence.
-- Indexes: Consider category + rating for analytics.
-- Relationships: Created by User; linked to Reviews, Ratings, Registrations.
+### Comprehensive Events Management
+- Schema evolution: Support for both ticketed and full-service events with unified management
+- Advanced features: Ticket inventory management, date/time scheduling, location tracking, comprehensive feature lists
+- Business logic: Event status management, capacity tracking, pricing strategies
 
 ```mermaid
 erDiagram
@@ -265,8 +290,17 @@ ObjectId _id PK
 string title
 string description
 string category
+string eventType
 number price
-number rating
+string location
+date date
+string time
+number duration
+number tickets
+number totalTickets
+number availableTickets
+string status
+object rating
 array images
 array features
 ObjectId createdBy FK
@@ -284,32 +318,39 @@ USER ||--o{ EVENT : "createdBy"
 - [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 
-### Bookings
-- Schema highlights: user, service identifiers, dates, notes, status enum, guestCount, totalPrice.
-- Validation: Status enum, guestCount default, totalPrice numeric.
-- Indexes: Consider user + createdAt, status, eventDate.
-- Relationships: References User and Service; links to Payments and Notifications.
+### Advanced Booking System
+- Enhanced schema: Unified booking system supporting both events and services
+- Comprehensive tracking: Guest management, special requirements, payment integration
+- Status management: Multi-stage booking lifecycle with detailed status tracking
 
 ```mermaid
 erDiagram
 BOOKING {
 ObjectId _id PK
 ObjectId user FK
-string serviceId
-string serviceTitle
-string serviceCategory
-number servicePrice
+ObjectId merchant FK
+string type
+string eventType
+string eventId
+string eventTitle
+string eventCategory
+number eventPrice
+date serviceDate
+string serviceTime
 date bookingDate
-date eventDate
-string notes
+number guests
+string specialRequirements
 string status
-number guestCount
 number totalPrice
+string paymentStatus
+string ticketType
+number ticketCount
 timestamp createdAt
 timestamp updatedAt
 }
 USER ||--o{ BOOKING : "user"
-SERVICE ||--o{ BOOKING : "serviceId"
+MERCHANT ||--o{ BOOKING : "merchant"
+EVENT ||--o{ BOOKING : "eventId"
 ```
 
 **Diagram sources**
@@ -322,11 +363,10 @@ SERVICE ||--o{ BOOKING : "serviceId"
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 - [serviceSchema.js:14-77](file://backend/models/serviceSchema.js#L14-L77)
 
-### Services
-- Schema highlights: title, description, category enum, price, rating, images array, isActive, createdBy.
-- Validation: Category enum, price min, rating bounds, images count, lengths.
-- Indexes: Text index on title/description/category for search.
-- Relationships: Created by User; referenced by Bookings and Payments.
+### Production-Ready Services Architecture
+- Enhanced schema: Rich service catalog with comprehensive metadata and search optimization
+- Performance features: Text indexes for full-text search, category filtering, rating aggregation
+- Business capabilities: Active/inactive management, merchant service tracking
 
 ```mermaid
 erDiagram
@@ -357,12 +397,10 @@ BOOKING ||--o{ SERVICE : "serviceId"
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 - [bookingSchema.js:3-50](file://backend/models/bookingSchema.js#L3-L50)
 
-### Coupons
-- Schema highlights: code (unique, uppercase), discountType, discountValue, maxDiscount, minAmount, expiryDate, usageLimit, usedCount, isActive, description, createdBy, applicableEvents[], applicableCategories[], applicableUsers[], usageHistory[].
-- Validation: Uppercase code, discount value min, expiry date, usage limits, counts.
-- Indexes: Unique code, composite isActive + expiryDate, createdBy.
-- Middleware: Pre-save uppercase code.
-- Relationships: Created by User; applicable to Events and Categories; tracks usage via Booking.
+### Comprehensive Coupon Management
+- Advanced schema: Sophisticated discount system with usage tracking and applicability rules
+- Business logic: Usage limits, expiration management, category targeting, user-specific restrictions
+- Operational features: Usage history tracking, real-time validation, automated cleanup
 
 ```mermaid
 erDiagram
@@ -397,11 +435,10 @@ USER ||--o{ COUPON : "createdBy"
 - [couponSchema.js:3-98](file://backend/models/couponSchema.js#L3-L98)
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 
-### Follows
-- Schema highlights: user, merchant.
-- Validation: References User for both fields.
-- Indexes: Unique compound index on user + merchant.
-- Relationships: Both sides reference User.
+### Enhanced Relationship Management
+- Simplified schema: Direct user-merchant relationship tracking
+- Performance optimization: Unique compound indexing prevents duplicate relationships
+- Scalability: Efficient querying for follower/following lists
 
 ```mermaid
 erDiagram
@@ -424,11 +461,10 @@ USER ||--o{ FOLLOW : "merchant"
 - [followSchema.js:3-21](file://backend/models/followSchema.js#L3-L21)
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 
-### Reviews
-- Schema highlights: user, event, rating, reviewText.
-- Validation: Rating bounds, uniqueness constraint on user + event.
-- Indexes: Unique compound index on user + event.
-- Relationships: Links User and Event.
+### Quality Assurance Systems
+- Dual feedback mechanism: Separate review text and numerical ratings for comprehensive feedback
+- Data integrity: Unique constraints prevent duplicate feedback entries
+- Analytics support: Structured data enables rating aggregation and review analysis
 
 ```mermaid
 erDiagram
@@ -441,28 +477,6 @@ string reviewText
 timestamp createdAt
 timestamp updatedAt
 }
-USER ||--o{ REVIEW : "user"
-EVENT ||--o{ REVIEW : "event"
-```
-
-**Diagram sources**
-- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
-- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
-- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
-
-**Section sources**
-- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
-- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
-- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
-
-### Ratings
-- Schema highlights: user, event, rating.
-- Validation: Rating bounds, uniqueness constraint on user + event.
-- Indexes: Unique compound index on user + event.
-- Relationships: Links User and Event.
-
-```mermaid
-erDiagram
 RATING {
 ObjectId _id PK
 ObjectId user FK
@@ -471,25 +485,28 @@ number rating
 timestamp createdAt
 timestamp updatedAt
 }
+USER ||--o{ REVIEW : "user"
+EVENT ||--o{ REVIEW : "event"
 USER ||--o{ RATING : "user"
 EVENT ||--o{ RATING : "event"
 ```
 
 **Diagram sources**
+- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
 - [ratingSchema.js:3-23](file://backend/models/ratingSchema.js#L3-L23)
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 - [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
 
 **Section sources**
+- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
 - [ratingSchema.js:3-23](file://backend/models/ratingSchema.js#L3-L23)
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 - [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
 
-### Notifications
-- Schema highlights: user, message, read, eventId, bookingId, type.
-- Validation: Enum for type, references for user and bookingId.
-- Indexes: Consider user + createdAt, read.
-- Relationships: Links User; optionally links Booking.
+### Comprehensive Notification System
+- Context-aware messaging: Event-specific and booking-specific notifications
+- User experience: Read/unread status tracking with chronological ordering
+- Scalability: Efficient indexing for user-centric notification retrieval
 
 ```mermaid
 erDiagram
@@ -518,12 +535,10 @@ BOOKING ||--o{ NOTIFICATION : "bookingId"
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 - [bookingSchema.js:3-50](file://backend/models/bookingSchema.js#L3-L50)
 
-### Payments
-- Schema highlights: userId, merchantId, bookingId, eventId, amounts, commission percent, status, paymentMethod, transactionId (unique), gateway, refund fields, payout fields, currency, description, metadata.
-- Validation: Amounts validated via pre-save middleware, enums for status and method, unique transactionId.
-- Indexes: Composite indexes on userId/merchantId + createdAt, bookingId, transactionId, paymentStatus.
-- Middleware: Pre-save amount validation.
-- Relationships: Links User (userId, merchantId), Booking, Event.
+### Enterprise Payment Processing
+- Complete financial tracking: Multi-stakeholder commission management
+- Audit trail: Comprehensive payment history with refund tracking
+- Compliance: Currency support, detailed metadata, transaction verification
 
 ```mermaid
 erDiagram
@@ -572,37 +587,10 @@ EVENT ||--o{ PAYMENT : "eventId"
 - [bookingSchema.js:3-50](file://backend/models/bookingSchema.js#L3-L50)
 - [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
 
-### Registrations
-- Schema highlights: user, event.
-- Relationships: Links User and Event.
-
-```mermaid
-erDiagram
-REGISTRATION {
-ObjectId _id PK
-ObjectId user FK
-ObjectId event FK
-timestamp createdAt
-timestamp updatedAt
-}
-USER ||--o{ REGISTRATION : "user"
-EVENT ||--o{ REGISTRATION : "event"
-```
-
-**Diagram sources**
-- [registrationSchema.js:3-9](file://backend/models/registrationSchema.js#L3-L9)
-- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
-- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
-
-**Section sources**
-- [registrationSchema.js:3-9](file://backend/models/registrationSchema.js#L3-L9)
-- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
-- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
-
-### Messages
-- Schema highlights: name, email, subject, message.
-- Validation: Length and format checks.
-- Relationships: No relational references.
+### Contact Management
+- Simple schema: Essential contact form data with validation
+- Privacy: No user account creation from contact submissions
+- Integration: Supports customer service workflows
 
 ```mermaid
 erDiagram
@@ -622,7 +610,7 @@ string message
 - [messageSchema.js:4-25](file://backend/models/messageSchema.js#L4-L25)
 
 ## Dependency Analysis
-The following diagram shows inter-collection dependencies inferred from schema references and relationships documented above.
+The enhanced dependency graph reflects the comprehensive relationships between collections, with particular emphasis on the unified booking system and advanced notification architecture.
 
 ```mermaid
 graph TB
@@ -638,6 +626,7 @@ NOTIFICATION["Notification"]
 PAYMENT["Payment"]
 REG["Registration"]
 MSG["Message"]
+MERCHANT["Merchant"]
 USER --> EVENT
 USER --> SERVICE
 USER --> BOOKING
@@ -650,10 +639,19 @@ USER --> FOLLOW
 EVENT --> REVIEW
 EVENT --> RATING
 EVENT --> REG
+EVENT --> BOOKING
 BOOKING --> PAYMENT
 BOOKING --> NOTIFICATION
 SERVICE --> BOOKING
 COUPON --> BOOKING
+NOTIFICATION --> USER
+NOTIFICATION --> BOOKING
+PAYMENT --> USER
+PAYMENT --> BOOKING
+PAYMENT --> EVENT
+MERCHANT --> EVENT
+MERCHANT --> SERVICE
+MERCHANT --> BOOKING
 ```
 
 **Diagram sources**
@@ -685,108 +683,222 @@ COUPON --> BOOKING
 - [messageSchema.js:4-25](file://backend/models/messageSchema.js#L4-L25)
 
 ## Performance Considerations
-- Indexing strategy
-  - Services: Full-text index on title, description, category to support search.
-  - Coupons: Unique index on code, composite index on isActive + expiryDate, index on createdBy.
-  - Payments: Composite indexes on userId + createdAt (descending), merchantId + createdAt (descending), bookingId, transactionId, paymentStatus.
-  - Reviews/Ratings: Unique compound index on user + event to prevent duplicates.
-  - Follows: Unique compound index on user + merchant to prevent duplicate follow relationships.
-  - Notifications: Consider indexes on user + createdAt and read for efficient pagination and filtering.
-  - Users: Consider a unique index on email for fast authentication and lookup.
+- Enhanced indexing strategy
+  - Events: Compound index on (category + status) for filtering, date index for scheduling queries
+  - Services: Text index on title/description/category for search, category index for filtering
+  - Bookings: Compound index on (user + status) for user-centric queries, paymentStatus index for financial reporting
+  - Payments: Composite indexes on (userId + createdAt), (merchantId + createdAt), bookingId, transactionId, paymentStatus
+  - Reviews/Ratings: Unique compound index on (user + event) to prevent duplicates and enable fast lookup
+  - Follows: Unique compound index on (user + merchant) for relationship management
+  - Notifications: Compound index on (user + createdAt) for timeline queries, read status index for filtering
 - Query optimization
-  - Use lean queries and selective projections to reduce payload size.
-  - Prefer compound indexes aligned with common filter/sort patterns (e.g., user + createdAt).
-  - Avoid N+1 queries by populating references judiciously and batching operations.
-- Connection and reliability
-  - The connection module retries multiple strategies and uses forced DNS to resolve SRV records reliably.
-  - Mongoose options include timeouts, pool size, retry writes, and write concern for durability.
-- Data validation
-  - Pre-save middleware ensures amount correctness in Payments and normalizes Coupon codes to uppercase.
-- Storage and embedding
-  - Embedded arrays (images, features) keep related data close; consider capped arrays where appropriate.
-  - References are used for denormalization boundaries (e.g., user references) to avoid document growth issues.
+  - Use lean queries and selective projections to minimize payload size
+  - Leverage compound indexes for common filter/sort patterns (user + createdAt, category + status)
+  - Implement pagination for large result sets, especially for notifications and booking histories
+  - Use aggregation pipelines for complex reporting queries on payments and bookings
+- Production connection reliability
+  - Multi-strategy connection with automatic fallback between SRV, manual SRV resolution, and direct shard connections
+  - Enhanced DNS configuration with permanent Google and Cloudflare DNS servers
+  - Comprehensive error handling with detailed logging and actionable troubleshooting messages
+  - Connection monitoring with event listeners for disconnection/reconnection events
+- Data validation and integrity
+  - Pre-save middleware for amount validation in payments and code normalization in coupons
+  - Comprehensive input validation at schema level with custom validators
+  - Unique constraints to prevent data duplication across critical relationships
+- Storage optimization
+  - Embedded arrays for related data (images, features) with reasonable size limits
+  - Reference patterns for scalable relationships (user references) to avoid document growth issues
+  - Efficient indexing strategy to balance write performance with query speed
 
-[No sources needed since this section provides general guidance]
+## Production-Ready Database Configuration
+The platform now supports comprehensive production-ready database configurations with multiple deployment options and robust operational procedures.
 
-## Troubleshooting Guide
-- MongoDB Atlas connectivity
-  - The connection module implements three strategies: SRV URI with forced DNS, manual SRV resolution, and direct shard hostnames. It logs detailed failures and exits with actionable steps if all attempts fail.
-  - Recommended checklist includes verifying network access (allowing 0.0.0.0/0), confirming cluster activity, validating credentials, and testing DNS resolution.
-- Setup and permanent solutions
-  - Follow the Atlas setup guide and permanent solution documents for environment configuration and long-term stability.
-- Local development vs Atlas
-  - The connection module does not fall back to a local database on failure; ensure Atlas is reachable and configured correctly.
+### MongoDB Atlas Configuration
+- **Cluster Setup**: MongoDB Atlas cluster with automatic scaling and high availability
+- **Network Security**: IP whitelist configuration with flexible access controls
+- **Authentication**: Dedicated database users with appropriate permissions
+- **Backup Strategy**: Automated backups with point-in-time recovery capabilities
+- **Monitoring**: Built-in performance monitoring and alerting systems
+
+### Permanent DNS Configuration Solution
+The comprehensive DNS configuration script provides permanent resolution of MongoDB Atlas SRV records through multiple layers of system integration:
+
+```mermaid
+graph TD
+A["System Startup"] --> B["PowerShell Execution"]
+B --> C["Administrator Privileges Check"]
+C --> D["DNS Server Configuration"]
+D --> E["Google DNS (8.8.8.8)"]
+D --> F["Cloudflare DNS (1.1.1.1)"]
+D --> G["OpenDNS Backup"]
+E --> H["Network Adapter Update"]
+F --> H
+G --> H
+H --> I["Hosts File Modification"]
+I --> J["MongoDB Atlas IP Entries"]
+J --> K["DNS Cache Clearing"]
+K --> L["Network Stack Reset"]
+L --> M["Connection Testing"]
+M --> N["Operational Success"]
+```
+
+**Diagram sources**
+- [fix-atlas-dns-permanent.ps1:18-101](file://backend/fix-atlas-dns-permanent.ps1#L18-L101)
+
+### Connection Strategy Implementation
+The enhanced connection module implements three-tiered connection reliability:
+
+1. **Primary Strategy**: SRV URI with forced DNS resolution using Google and Cloudflare DNS servers
+2. **Secondary Strategy**: Manual SRV record resolution with custom DNS client
+3. **Emergency Strategy**: Direct shard host connections with replica set configuration
 
 **Section sources**
-- [dbConnection.js:19-94](file://backend/database/dbConnection.js#L19-L94)
-- [MONGODB_ATLAS_SETUP_GUIDE.md](file://backend/MONGODB_ATLAS_SETUP_GUIDE.md)
-- [MONGODB_ATLAS_PERMANENT_SOLUTION.md](file://backend/MONGODB_ATLAS_PERMANENT_SOLUTION.md)
-- [DATABASE_TROUBLESHOOTING.md](file://backend/DATABASE_TROUBLESHOOTING.md)
+- [dbConnection.js:19-112](file://backend/database/dbConnection.js#L19-L112)
+- [fix-atlas-dns-permanent.ps1:18-101](file://backend/fix-atlas-dns-permanent.ps1#L18-L101)
+
+## Comprehensive Data Migration Procedures
+The platform provides complete data migration capabilities between local and cloud environments with automated validation and rollback support.
+
+### Migration Tool Suite
+- **migrate-to-atlas.js**: Complete data migration from local MongoDB to MongoDB Atlas
+- **sync-local-to-atlas.js**: Incremental synchronization of local changes to Atlas
+- **populate-atlas-database.js**: Sample data population for development and testing environments
+
+### Migration Workflow
+```mermaid
+sequenceDiagram
+participant Dev as Developer
+participant Local as Local DB
+participant Script as Migration Script
+participant Atlas as MongoDB Atlas
+Dev->>Script : Execute migration command
+Script->>Local : Connect to local database
+Script->>Local : Export all collections
+Local-->>Script : Return exported data
+Script->>Script : Validate data integrity
+Script->>Atlas : Connect to Atlas
+Atlas-->>Script : Connection established
+Script->>Atlas : Clear existing data
+Script->>Atlas : Import users collection
+Script->>Atlas : Import events collection
+Script->>Atlas : Import bookings collection
+Script->>Atlas : Verify migration
+Atlas-->>Script : Migration complete
+Script-->>Dev : Success notification
+```
+
+**Diagram sources**
+- [migrate-to-atlas.js:9-97](file://backend/migrate-to-atlas.js#L9-L97)
+- [sync-local-to-atlas.js:9-137](file://backend/sync-local-to-atlas.js#L9-L137)
+- [populate-atlas-database.js:10-263](file://backend/populate-atlas-database.js#L10-L263)
+
+### Migration Features
+- **Data Validation**: Automatic validation of data integrity during migration
+- **Progress Tracking**: Real-time progress reporting for long-running migrations
+- **Error Handling**: Comprehensive error handling with rollback capabilities
+- **Atomic Operations**: Collection-level atomic imports to prevent partial data states
+- **Verification**: Post-migration verification of imported data completeness
+
+**Section sources**
+- [migrate-to-atlas.js:9-97](file://backend/migrate-to-atlas.js#L9-L97)
+- [sync-local-to-atlas.js:9-137](file://backend/sync-local-to-atlas.js#L9-L137)
+- [populate-atlas-database.js:10-263](file://backend/populate-atlas-database.js#L10-L263)
+
+## Advanced Troubleshooting and Diagnostics
+The platform provides comprehensive diagnostic tools and troubleshooting procedures for MongoDB Atlas connectivity issues.
+
+### Connection Testing Suite
+The test-atlas-connection.js script provides systematic testing of multiple connection methods:
+
+1. **SRV Connection Testing**: Validates standard MongoDB Atlas SRV connection
+2. **Direct Replica Set Testing**: Tests connection using direct shard host URLs
+3. **Single IP Testing**: Validates connection using individual shard IP addresses
+
+### Diagnostic Features
+- **Multi-method Testing**: Automatic testing of connection strategies in order of preference
+- **Operation Validation**: Tests write/read operations to validate database functionality
+- **Error Classification**: Detailed error messages with specific remediation steps
+- **Network Diagnostics**: Connectivity testing and network configuration validation
+
+### Troubleshooting Workflow
+```mermaid
+flowchart TD
+A[Connection Failure Detected] --> B{Error Type Analysis}
+B --> C[ECONNREFUSED - Network Issue]
+B --> D[Authentication Failed]
+B --> E[DNS Resolution Error]
+B --> F[Timeout Error]
+C --> G[Check IP Whitelist]
+G --> H[Verify Cluster Status]
+H --> I[Network Connectivity Test]
+D --> J[Verify Credentials]
+J --> K[Check User Permissions]
+K --> L[Validate Database Name]
+E --> M[Run DNS Fix Script]
+M --> N[Update Hosts File]
+N --> O[Clear DNS Cache]
+F --> P[Increase Timeout Values]
+P --> Q[Check Firewall Settings]
+Q --> R[Test Alternative Networks]
+```
+
+**Diagram sources**
+- [test-atlas-connection.js:6-98](file://backend/test-atlas-connection.js#L6-L98)
+- [fix-dns-windows.bat:1-29](file://backend/fix-dns-windows.bat#L1-L29)
+
+### Operational Monitoring
+The enhanced connection module provides comprehensive monitoring of database operations:
+
+- **Connection State Tracking**: Real-time monitoring of connection status changes
+- **Error Logging**: Detailed error messages with actionable troubleshooting guidance
+- **Reconnection Handling**: Automatic reconnection attempts with exponential backoff
+- **Performance Metrics**: Connection timing and performance monitoring
+
+**Section sources**
+- [test-atlas-connection.js:6-98](file://backend/test-atlas-connection.js#L6-L98)
+- [fix-dns-windows.bat:1-29](file://backend/fix-dns-windows.bat#L1-L29)
+- [dbConnection.js:96-112](file://backend/database/dbConnection.js#L96-L112)
 
 ## Conclusion
-The database design for the MERN Stack Event Management Platform emphasizes clear entity relationships, strong validation, and targeted indexing to support search, payments, and user interactions. The connection module ensures reliable access to MongoDB Atlas with multiple fallback strategies and DNS overrides. By following the indexing and query optimization recommendations and leveraging the provided troubleshooting resources, the platform can maintain performance and scalability as it evolves.
-
-[No sources needed since this section summarizes without analyzing specific files]
+The enhanced database design for the MERN Stack Event Management Platform represents a comprehensive evolution toward production-ready database operations. The integration of MongoDB Atlas with permanent DNS configuration solutions ensures reliable connectivity, while the extensive migration tool suite provides seamless data portability between local and cloud environments. The multi-strategy connection approach with comprehensive monitoring and troubleshooting capabilities delivers enterprise-grade database reliability. The detailed schema design with optimized indexing strategies, robust validation rules, and comprehensive relationship management supports the platform's complex event management and booking workflows. These enhancements collectively provide a solid foundation for scalable, reliable, and maintainable database operations in production environments.
 
 ## Appendices
 
-### A. Collection Indexes Summary
-- Services: Text index on title, description, category
-- Coupons: Unique code, composite isActive + expiryDate, createdBy
-- Payments: Composite userId + createdAt(desc), merchantId + createdAt(desc), bookingId, transactionId, paymentStatus
-- Reviews: Unique user + event
-- Ratings: Unique user + event
-- Follows: Unique user + merchant
-- Notifications: Consider user + createdAt, read
-- Users: Consider unique email
+### A. Enhanced Collection Indexes Summary
+- **Events**: Compound (category + status), date index for scheduling queries
+- **Services**: Text index on (title, description, category), category index for filtering
+- **Bookings**: Compound (user + status), paymentStatus index for financial reporting
+- **Payments**: Composite (userId + createdAt), (merchantId + createdAt), bookingId, transactionId, paymentStatus
+- **Reviews**: Unique (user + event) to prevent duplicate feedback
+- **Ratings**: Unique (user + event) for data integrity
+- **Follows**: Unique (user + merchant) for relationship management
+- **Notifications**: Compound (user + createdAt), read status index for filtering
+- **Users**: Consider unique email index for authentication
 
 **Section sources**
-- [serviceSchema.js:79-80](file://backend/models/serviceSchema.js#L79-L80)
-- [couponSchema.js:110-113](file://backend/models/couponSchema.js#L110-L113)
-- [paymentSchema.js:122-127](file://backend/models/paymentSchema.js#L122-L127)
-- [reviewSchema.js:13-14](file://backend/models/reviewSchema.js#L13-L14)
-- [ratingSchema.js:25-26](file://backend/models/ratingSchema.js#L25-L26)
-- [followSchema.js:19-20](file://backend/models/followSchema.js#L19-L20)
+- [eventSchema.js:3-20](file://backend/models/eventSchema.js#L3-L20)
+- [serviceSchema.js:14-77](file://backend/models/serviceSchema.js#L14-L77)
+- [bookingSchema.js:3-50](file://backend/models/bookingSchema.js#L3-L50)
+- [paymentSchema.js:3-109](file://backend/models/paymentSchema.js#L3-L109)
+- [reviewSchema.js:3-11](file://backend/models/reviewSchema.js#L3-L11)
+- [ratingSchema.js:3-23](file://backend/models/ratingSchema.js#L3-L23)
+- [followSchema.js:3-21](file://backend/models/followSchema.js#L3-L21)
 - [notificationSchema.js:3-33](file://backend/models/notificationSchema.js#L3-L33)
-- [userSchema.js:26-31](file://backend/models/userSchema.js#L26-L31)
+- [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
 
-### B. Sample Data Structures
-- Users
-  - Fields: name, businessName, phone, serviceType, email, password, role, status
-  - Example: { name: "...", email: "...", role: "user|merchant|admin", status: "active|inactive", ... }
-- Events
-  - Fields: title, description, category, price, rating, images[], features[], createdBy
-  - Example: { title: "...", category: "...", price: 0, rating: 0..5, images: [{ public_id: "...", url: "..." }], features: [...], createdBy: ObjectId, ... }
-- Bookings
-  - Fields: user, serviceId, serviceTitle, serviceCategory, servicePrice, bookingDate, eventDate, notes, status, guestCount, totalPrice
-  - Example: { user: ObjectId, serviceId: "...", status: "pending|confirmed|cancelled|completed", totalPrice: 0, ... }
-- Services
-  - Fields: title, description, category, price, rating, images[], isActive, createdBy
-  - Example: { title: "...", category: "wedding|corporate|...", price: 0, rating: 0..5, images: [...], isActive: true, createdBy: ObjectId, ... }
-- Coupons
-  - Fields: code, discountType, discountValue, maxDiscount, minAmount, expiryDate, usageLimit, usedCount, isActive, description, createdBy, applicableEvents[], applicableCategories[], applicableUsers[], usageHistory[]
-  - Example: { code: "...", discountType: "percentage|flat", discountValue: 0, expiryDate: Date, usageLimit: 1, usedCount: 0, ... }
-- Follows
-  - Fields: user, merchant
-  - Example: { user: ObjectId, merchant: ObjectId }
-- Reviews
-  - Fields: user, event, rating, reviewText
-  - Example: { user: ObjectId, event: ObjectId, rating: 1..5, reviewText: "..." }
-- Ratings
-  - Fields: user, event, rating
-  - Example: { user: ObjectId, event: ObjectId, rating: 1..5 }
-- Notifications
-  - Fields: user, message, read, eventId, bookingId, type
-  - Example: { user: ObjectId, message: "...", type: "booking|payment|general", ... }
-- Payments
-  - Fields: userId, merchantId, bookingId, eventId, totalAmount, adminCommission, merchantAmount, adminCommissionPercent, paymentStatus, paymentMethod, transactionId, paymentGateway, refund fields, merchant payout fields, currency, description, metadata
-  - Example: { totalAmount: 0, adminCommission: 0, merchantAmount: 0, paymentStatus: "pending|success|failed|refunded", paymentMethod: "UPI|Card|NetBanking|Cash|Wallet", transactionId: "...", ... }
-- Registrations
-  - Fields: user, event
-  - Example: { user: ObjectId, event: ObjectId }
-- Messages
-  - Fields: name, email, subject, message
-  - Example: { name: "...", email: "...", subject: "...", message: "..." }
+### B. Enhanced Sample Data Structures
+- **Users**: name, businessName, phone, serviceType, email, password, role, status
+- **Events**: title, description, category, eventType, price, location, date, time, duration, tickets, totalTickets, availableTickets, status, rating, images[], features[], createdBy
+- **Bookings**: user, merchant, type, eventType, eventId, eventTitle, eventCategory, eventPrice, serviceDate, serviceTime, bookingDate, guests, specialRequirements, status, totalPrice, paymentStatus, ticketType, ticketCount
+- **Services**: title, description, category, price, rating, images[], isActive, createdBy
+- **Coupons**: code, discountType, discountValue, maxDiscount, minAmount, expiryDate, usageLimit, usedCount, isActive, description, createdBy, applicableEvents[], applicableCategories[], applicableUsers[], usageHistory[]
+- **Follows**: user, merchant
+- **Reviews**: user, event, rating, reviewText
+- **Ratings**: user, event, rating
+- **Notifications**: user, message, read, eventId, bookingId, type
+- **Payments**: userId, merchantId, bookingId, eventId, totalAmount, adminCommission, merchantAmount, adminCommissionPercent, paymentStatus, paymentMethod, transactionId, paymentGateway, refund fields, merchant payout fields, currency, description, metadata
+- **Registrations**: user, event
+- **Messages**: name, email, subject, message
 
 **Section sources**
 - [userSchema.js:4-52](file://backend/models/userSchema.js#L4-L52)
@@ -802,18 +914,31 @@ The database design for the MERN Stack Event Management Platform emphasizes clea
 - [registrationSchema.js:3-9](file://backend/models/registrationSchema.js#L3-L9)
 - [messageSchema.js:4-25](file://backend/models/messageSchema.js#L4-L25)
 
-### C. Migration Procedures
-- Local to Atlas
-  - Prepare environment variables and credentials as configured in the connection module.
-  - Use the provided scripts to migrate data from a local database to Atlas if applicable.
-  - Validate connectivity using the Atlas connection script and confirm collections are created.
-- Data seeding
-  - Use seed scripts to populate initial data for services, events, and users as needed.
-- Backup and restore
-  - Use Atlas backup features and restore procedures to safeguard data during migrations.
+### C. Production Deployment Checklist
+- **MongoDB Atlas Setup**: Cluster provisioning, network access configuration, user creation
+- **DNS Configuration**: Permanent DNS server setup, hosts file modification, network stack reset
+- **Connection Testing**: Multi-strategy connection validation, operational testing
+- **Data Migration**: Local to Atlas migration, data validation, backup verification
+- **Monitoring Setup**: Connection monitoring, error logging, performance metrics
+- **Security Configuration**: IP whitelist, authentication, encryption settings
+- **Backup Strategy**: Automated backup configuration, disaster recovery procedures
 
 **Section sources**
-- [dbConnection.js:19-94](file://backend/database/dbConnection.js#L19-L94)
-- [DATABASE_SETUP.md](file://backend/DATABASE_SETUP.md)
-- [MONGODB_ATLAS_SETUP_GUIDE.md](file://backend/MONGODB_ATLAS_SETUP_GUIDE.md)
-- [MONGODB_ATLAS_PERMANENT_SOLUTION.md](file://backend/MONGODB_ATLAS_PERMANENT_SOLUTION.md)
+- [MONGODB_ATLAS_PERMANENT_SOLUTION.md:1-173](file://backend/MONGODB_ATLAS_PERMANENT_SOLUTION.md#L1-L173)
+- [DATABASE_TROUBLESHOOTING.md:1-137](file://backend/DATABASE_TROUBLESHOOTING.md#L1-L137)
+- [test-atlas-connection.js:6-98](file://backend/test-atlas-connection.js#L6-L98)
+
+### D. Migration Command Reference
+- **Complete Migration**: `node migrate-to-atlas.js`
+- **Local Sync**: `node sync-local-to-atlas.js`
+- **Sample Data**: `node populate-atlas-database.js`
+- **Connection Test**: `node test-atlas-connection.js`
+- **DNS Fix**: `./fix-dns-windows.bat` or `./fix-atlas-dns-permanent.ps1`
+
+**Section sources**
+- [migrate-to-atlas.js:9-97](file://backend/migrate-to-atlas.js#L9-L97)
+- [sync-local-to-atlas.js:9-137](file://backend/sync-local-to-atlas.js#L9-L137)
+- [populate-atlas-database.js:10-263](file://backend/populate-atlas-database.js#L10-L263)
+- [test-atlas-connection.js:6-98](file://backend/test-atlas-connection.js#L6-L98)
+- [fix-dns-windows.bat:1-29](file://backend/fix-dns-windows.bat#L1-L29)
+- [fix-atlas-dns-permanent.ps1:1-165](file://backend/fix-atlas-dns-permanent.ps1#L1-L165)

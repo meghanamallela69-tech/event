@@ -128,21 +128,6 @@ export const createFullServiceBooking = async (req, res) => {
       });
     }
 
-    // Check if user already has a pending/approved booking for this event
-    const existingBooking = await Booking.findOne({
-      user: userId,
-      eventId: eventId,
-      bookingStatus: { $in: ["pending", "confirmed"] }
-    });
-
-    if (existingBooking) {
-      console.log("❌ User already has booking for this event:", existingBooking._id);
-      return res.status(400).json({
-        success: false,
-        message: "You already have an active booking for this event"
-      });
-    }
-
     console.log("🔄 Creating new booking...");
 
     // Calculate pricing with coupon if provided

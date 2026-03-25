@@ -29,7 +29,12 @@ import UserProfile from "./pages/dashboards/UserProfile";
 import UserSavedEvents from "./pages/dashboards/UserSavedEvents";
 import UserNotifications from "./pages/dashboards/UserNotifications";
 import AdminDashboardUI from "./pages/dashboards/AdminDashboardUI";
+import AdminNotifications from "./pages/dashboards/AdminNotifications";
 import MerchantDashboard from "./pages/dashboards/MerchantDashboard";
+import MerchantNotifications from "./pages/dashboards/MerchantNotifications";
+import MerchantAnalytics from "./pages/dashboards/MerchantAnalytics";
+import MerchantTicketValidation from "./pages/dashboards/MerchantTicketValidation";
+import MerchantMarketing from "./pages/dashboards/MerchantMarketing";
 import MerchantEvents from "./pages/dashboards/MerchantEvents";
 import MerchantCreateEvent from "./pages/dashboards/MerchantCreateEvent";
 import MerchantEditEvent from "./pages/dashboards/MerchantEditEvent";
@@ -43,6 +48,7 @@ import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminEvents from "./pages/dashboards/AdminEvents";
 import AdminRegistrations from "./pages/dashboards/AdminRegistrations";
 import AdminAnalytics from "./pages/dashboards/AdminAnalytics";
+import AdminProfile from "./pages/dashboards/AdminProfile";
 import AdminSettings from "./pages/dashboards/AdminSettings";
 import AdminCategories from "./pages/dashboards/AdminCategories";
 import AdminPayments from "./pages/dashboards/AdminPayments";
@@ -226,6 +232,28 @@ const AppContent = () => {
           />
 
           <Route
+            path="/dashboard/admin/profile"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminProfile />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/notifications"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="admin">
+                  <AdminNotifications />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/dashboard/admin/categories"
             element={
               <PrivateRoute>
@@ -342,6 +370,50 @@ const AppContent = () => {
               <PrivateRoute>
                 <RoleRoute role="merchant">
                   <MerchantSettings />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/merchant/notifications"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantNotifications />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/merchant/analytics"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantAnalytics />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/merchant/ticket-validation"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantTicketValidation />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/merchant/marketing"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantMarketing />
                 </RoleRoute>
               </PrivateRoute>
             }

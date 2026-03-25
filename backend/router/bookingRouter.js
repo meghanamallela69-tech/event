@@ -5,13 +5,15 @@ import {
   getBookingById,
   cancelBooking,
   getAllBookings,
-  updateBookingStatus,
+  updateBookingStatus as adminUpdateBookingStatus,
   processPayment,
   getMerchantBookings,
   respondToBooking,
   confirmBooking,
   completeBooking,
   submitRating,
+  merchantUpdateBookingStatus,
+  validateTicket,
 } from "../controller/bookingController.js";
 import { auth } from "../middleware/authMiddleware.js";
 import { ensureRole } from "../middleware/roleMiddleware.js";
@@ -31,9 +33,13 @@ router.post("/:id/rate", auth, submitRating);
 router.get("/merchant/my-bookings", auth, ensureRole("merchant"), getMerchantBookings);
 router.put("/merchant/:id/respond", auth, ensureRole("merchant"), respondToBooking);
 router.put("/merchant/:id/confirm", auth, ensureRole("merchant"), confirmBooking);
+router.put("/merchant/:id/status", auth, ensureRole("merchant"), merchantUpdateBookingStatus);
+
+// Ticket validation route (merchant only)
+router.get("/merchant/validate-ticket/:ticketId", auth, ensureRole("merchant"), validateTicket);
 
 // Admin routes
 router.get("/admin/all", auth, ensureRole("admin"), getAllBookings);
-router.put("/admin/:id/status", auth, ensureRole("admin"), updateBookingStatus);
+router.put("/admin/:id/status", auth, ensureRole("admin"), adminUpdateBookingStatus);
 
 export default router;

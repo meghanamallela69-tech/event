@@ -1,5 +1,6 @@
 import { Booking } from "../models/bookingSchema.js";
 import { Event } from "../models/eventSchema.js";
+import { Coupon } from "../models/couponSchema.js";
 import { v4 as uuidv4 } from "uuid";
 
 // Helper function to generate ticket
@@ -23,65 +24,61 @@ const generateTicket = (booking, eventType) => {
 export const createBooking = async (req, res) => {
   try {
     const { 
+      userId,
       serviceId, 
+      eventId,
       serviceTitle, 
       serviceCategory, 
-      servicePrice,
+      servicePrice, 
       eventType,
       eventDate,
-      eventTime, // Add eventTime field
+      eventTime,
+      timeSlot,
+      date,
+      time,
+      location,
       notes,
       guestCount,
-      location,
       locationType,
-      selectedTickets, // New: { "Regular": 2, "VIP": 1 }
+      selectedTickets,
+      selectedAddOns,
+      addons,
       totalAmount,
       discount,
       promoCode,
-      addons,
-      timeSlot
+      status
     } = req.body;
 
-    const userId = req.user.userId;
-
-    // Validate required fields - make validation more flexible
-    if (!serviceId) {
-      return res.status(400).json({ 
+    // Use authenticated user's ID or fall back to provided userId
+    const authenticatedUserId = req.user?.userId || userId;
+    
+    if (!authenticatedUserId) {
+      return res.status(401).json({ 
         success: false, 
-        message: "Service ID is required" 
+        message: "User authentication required" 
       });
     }
 
-    if (!serviceTitle) {
+    // Validate minimum required fields for full-service booking
+    if (!serviceId && !eventId) {
       return res.status(400).json({ 
         success: false, 
-        message: "Service title is required" 
+        message: "Service ID or Event ID is required" 
       });
     }
+
+    // Use eventId as serviceId if provided
+    const finalServiceId = serviceId || eventId;
 
     // Set default category if not provided
     const finalServiceCategory = serviceCategory || "event";
 
-    // Check if user already has a pending/accepted/paid booking for this service
-    const existingBooking = await Booking.findOne({ 
-      user: userId, 
-      serviceId: serviceId,
-      status: { $in: ["pending", "accepted", "paid", "confirmed"] }
-    });
-
-    if (existingBooking) {
-      return res.status(409).json({ 
-        success: false, 
-        message: "You already have an active booking for this event" 
-      });
-    }
-
     // Get event details to determine workflow
-    const event = await Event.findById(serviceId);
+    const event = await Event.findById(finalServiceId);
     const evtType = eventType || (event?.eventType) || "full-service";
 
     // Calculate total price and guest count
-    let finalTotalPrice = totalAmount || servicePrice;
+    let finalTotalPrice = totalAmount || servicePrice || 0;
     let totalGuests = 0;
     
     if (evtType === "ticketed" && selectedTickets) {
@@ -106,15 +103,20 @@ export const createBooking = async (req, res) => {
     } else {
       // For full-service events
       totalGuests = parseInt(guestCount) || 1;
-      finalTotalPrice = servicePrice * totalGuests;
       
-      // Add addon prices
-      if (addons && Array.isArray(addons) && addons.length > 0) {
-        addons.forEach(addon => {
-          if (addon.price) {
-            finalTotalPrice += parseFloat(addon.price);
-          }
-        });
+      // Use provided totalAmount or calculate from base price + addons
+      if (!totalAmount && servicePrice) {
+        finalTotalPrice = servicePrice * totalGuests;
+        
+        // Add addon prices
+        const addonsArray = selectedAddOns || addons || [];
+        if (Array.isArray(addonsArray) && addonsArray.length > 0) {
+          addonsArray.forEach(addon => {
+            if (addon.price) {
+              finalTotalPrice += parseFloat(addon.price);
+            }
+          });
+        }
       }
       
       // Apply discount if provided
@@ -123,21 +125,25 @@ export const createBooking = async (req, res) => {
       }
     }
 
+    // Use eventDate/date and eventTime/time/timeSlot from request
+    const finalEventDate = eventDate || date || (event?.date) || new Date();
+    const finalEventTime = eventTime || time || timeSlot || (event?.time) || "06:00 PM";
+
     // Create booking object
     const bookingData = {
-      user: userId,
-      serviceId,
-      serviceTitle,
+      user: authenticatedUserId,
+      serviceId: finalServiceId.toString(), // Convert ObjectId to String as per schema
+      serviceTitle: serviceTitle || "Event Booking",
       serviceCategory: finalServiceCategory,
       servicePrice: servicePrice || 0,
       eventType: evtType,
-      eventDate: eventDate || (event?.date) || new Date(),
-      eventTime: eventTime || timeSlot || (event?.time) || "06:00 PM",
+      eventDate: finalEventDate,
+      eventTime: finalEventTime,
       notes: notes || "",
       guestCount: totalGuests,
       totalPrice: finalTotalPrice,
       bookingDate: new Date(),
-      status: evtType === "ticketed" ? "pending_payment" : "pending",
+      status: status || (evtType === "ticketed" ? "pending_payment" : "pending"),
       location: location || (event?.location) || "",
       locationType: locationType || "event",
     };
@@ -145,7 +151,9 @@ export const createBooking = async (req, res) => {
     // Add event-specific fields
     if (evtType === "ticketed") {
       // Store selected tickets information
-      bookingData.selectedTickets = selectedTickets;
+      if (selectedTickets) {
+        bookingData.selectedTickets = selectedTickets;
+      }
       
       // Add discount and promo code info (both optional)
       if (discount && discount > 0) {
@@ -161,28 +169,79 @@ export const createBooking = async (req, res) => {
         amount: finalTotalPrice
       };
     } else {
-      // Full service addons
-      if (addons && Array.isArray(addons)) {
-        bookingData.addons = addons;
+      // Full service addons - accept both selectedAddOns and addons
+      const addonsArray = selectedAddOns || addons || [];
+      if (Array.isArray(addonsArray) && addonsArray.length > 0) {
+        bookingData.addons = addonsArray;
+      } else {
+        bookingData.addons = []; // Default empty array
       }
+      
+      // Set payment object for full-service (schema uses payment.paid, not paymentStatus)
+      bookingData.payment = {
+        paid: false,
+        amount: finalTotalPrice
+      };
     }
+
+    console.log("Creating booking with data:", JSON.stringify(bookingData, null, 2));
+
+    // Validate data types before creating
+    console.log("\nData Type Validation:");
+    console.log("- serviceId type:", typeof bookingData.serviceId);
+    console.log("- eventDate type:", bookingData.eventDate instanceof Date ? "Date" : typeof bookingData.eventDate);
+    console.log("- eventTime type:", typeof bookingData.eventTime);
+    console.log("- servicePrice type:", typeof bookingData.servicePrice);
+    console.log("- totalPrice type:", typeof bookingData.totalPrice);
+    console.log("");
 
     // Create booking
     const booking = await Booking.create(bookingData);
 
+    console.log("✅ Booking created successfully:", booking._id);
+
+    // Track coupon usage if promo code was used
+    if (promoCode && promoCode.trim()) {
+      try {
+        const coupon = await Coupon.findOne({ 
+          code: promoCode.trim().toUpperCase(),
+          isActive: true 
+        });
+
+        if (coupon) {
+          // Update usage count
+          coupon.usedCount += 1;
+          
+          // Add to usage history
+          coupon.usageHistory.push({
+            user: userId,
+            booking: booking._id,
+            usedAt: new Date(),
+            discountAmount: discount || 0
+          });
+
+          await coupon.save();
+          console.log("✅ Coupon usage tracked:", coupon.code);
+        }
+      } catch (couponError) {
+        console.error("⚠️ Failed to track coupon usage:", couponError.message);
+        // Don't fail the booking if coupon tracking fails
+      }
+    }
+
     return res.status(201).json({ 
       success: true, 
-      message: evtType === "ticketed" 
-        ? "Booking created. Proceed to payment." 
-        : "Booking request sent to merchant.",
+      message: "Booking request sent successfully",
       booking,
       eventType: evtType
     });
   } catch (error) {
-    console.error("Booking error:", error);
+    console.error("❌ Booking creation error:", error);
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
     return res.status(500).json({ 
       success: false, 
-      message: "Failed to create booking" 
+      message: error.message || "Failed to create booking" 
     });
   }
 };
@@ -700,6 +759,70 @@ export const completeBooking = async (req, res) => {
   }
 };
 
+// Merchant update booking status (pending, processing, completed)
+export const merchantUpdateBookingStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const merchantId = req.user.userId;
+
+    // Validate status
+    const validStatuses = ["pending", "processing", "completed"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Must be: pending, processing, or completed"
+      });
+    }
+
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
+    }
+
+    // Verify this booking belongs to merchant's event
+    const event = await Event.findOne({ 
+      _id: booking.serviceId,
+      createdBy: merchantId 
+    });
+
+    if (!event) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this booking"
+      });
+    }
+
+    // Only allow status update for confirmed/paid bookings
+    if (!["confirmed", "paid", "processing"].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Can only update status of confirmed/paid/processing bookings"
+      });
+    }
+
+    // Update status
+    booking.status = status;
+    await booking.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Booking status updated to ${status}`,
+      booking
+    });
+  } catch (error) {
+    console.error("Update booking status error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update booking status"
+    });
+  }
+};
+
 // Submit rating and review for completed booking
 export const submitRating = async (req, res) => {
   try {
@@ -758,6 +881,116 @@ export const submitRating = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to submit rating"
+    });
+  }
+};
+
+// Validate ticket for merchant
+export const validateTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const merchantId = req.user.userId;
+
+    console.log(`🎫 Validating ticket: ${ticketId} by merchant: ${merchantId}`);
+
+    if (!ticketId || ticketId.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Ticket ID is required"
+      });
+    }
+
+    // Find booking by ticket number or ticket.ticketNumber
+    const booking = await Booking.findOne({
+      $or: [
+        { "ticket.ticketNumber": ticketId.toUpperCase() },
+        { _id: ticketId }
+      ]
+    }).populate("user", "name email phone")
+      .populate("serviceId", "title category eventType");
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found"
+      });
+    }
+
+    // Verify this booking belongs to merchant's event
+    const event = await Event.findOne({
+      _id: booking.serviceId,
+      createdBy: merchantId
+    });
+
+    if (!event) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to validate this ticket. This ticket is not for your event."
+      });
+    }
+
+    // Check if payment is completed
+    if (!booking.payment?.paid && booking.status !== "paid" && booking.status !== "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment not completed. Ticket cannot be validated."
+      });
+    }
+
+    // Check if ticket is already used
+    if (booking.ticket?.isUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Ticket already used",
+        usedAt: booking.ticket.usedAt,
+        booking: {
+          id: booking._id,
+          userName: booking.user?.name,
+          userPhone: booking.user?.phone,
+          userEmail: booking.user?.email,
+          eventTitle: booking.serviceId?.title,
+          ticketType: booking.ticket?.ticketType || "Standard",
+          quantity: booking.guestCount || 1,
+          status: booking.status
+        }
+      });
+    }
+
+    // Mark ticket as used
+    booking.ticket = {
+      ...booking.ticket,
+      isUsed: true,
+      usedAt: new Date(),
+      validatedBy: merchantId
+    };
+
+    await booking.save();
+
+    console.log(`✅ Ticket validated successfully: ${ticketId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Ticket validated successfully",
+      booking: {
+        id: booking._id,
+        ticketNumber: booking.ticket?.ticketNumber,
+        userName: booking.user?.name,
+        userPhone: booking.user?.phone,
+        userEmail: booking.user?.email,
+        eventTitle: booking.serviceId?.title,
+        ticketType: booking.ticket?.ticketType || "Standard",
+        quantity: booking.guestCount || 1,
+        totalPrice: booking.totalPrice,
+        status: booking.status,
+        isUsed: true,
+        usedAt: booking.ticket.usedAt
+      }
+    });
+  } catch (error) {
+    console.error("❌ Ticket validation error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to validate ticket"
     });
   }
 };

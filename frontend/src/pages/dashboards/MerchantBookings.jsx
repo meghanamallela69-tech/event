@@ -4,6 +4,7 @@ import useAuth from "../../context/useAuth";
 import { API_BASE, authHeaders } from "../../lib/http";
 import MerchantLayout from "../../components/merchant/MerchantLayout";
 import { FaListAlt, FaCheck, FaTimes, FaTicketAlt, FaClock, FaCreditCard } from "react-icons/fa";
+import { FiChevronDown } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const MerchantBookings = () => {
@@ -80,6 +81,23 @@ const MerchantBookings = () => {
       loadBookings();
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to confirm booking");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleStatusUpdate = async (bookingId, newStatus) => {
+    setProcessingId(bookingId);
+    try {
+      await axios.put(
+        `${API_BASE}/bookings/merchant/${bookingId}/status`,
+        { status: newStatus },
+        { headers: authHeaders(token) }
+      );
+      toast.success(`Booking status updated to ${newStatus}`);
+      loadBookings();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update status");
     } finally {
       setProcessingId(null);
     }
@@ -168,6 +186,30 @@ const MerchantBookings = () => {
         >
           {processingId === booking._id ? "..." : <><FaTicketAlt size={12} /> Confirm & Generate Ticket</>}
         </button>
+      );
+    }
+
+    // Status Update Dropdown for confirmed/paid/processing bookings
+    if (["confirmed", "paid", "processing"].includes(status) && booking.eventType === "full-service") {
+      const currentStatus = booking.status?.toLowerCase();
+      buttons.push(
+        <div key="status-dropdown" className="relative inline-block">
+          <select
+            value={currentStatus}
+            onChange={(e) => handleStatusUpdate(booking._id, e.target.value)}
+            disabled={processingId === booking._id}
+            className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed appearance-none pr-8"
+            style={{ minWidth: '140px' }}
+          >
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+          </select>
+          <FiChevronDown 
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-500" 
+            size={14} 
+          />
+        </div>
       );
     }
 

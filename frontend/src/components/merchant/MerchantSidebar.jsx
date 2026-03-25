@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { RxDashboard } from "react-icons/rx";
-import { BsCalendar2Event } from "react-icons/bs";
+import { BsCalendar2Event, BsBell, BsGraphUp, BsTicket, BsMegaphone } from "react-icons/bs";
 import { FaListAlt, FaCreditCard, FaUser, FaSignOutAlt, FaPlusCircle, FaRegCalendarCheck, FaCog } from "react-icons/fa";
 import PropTypes from "prop-types";
 
@@ -30,6 +30,10 @@ const MerchantSidebar = ({ onLogout }) => {
         <Item icon={FaPlusCircle} label="Create Event" to="/dashboard/merchant/create" />
         <Item icon={FaRegCalendarCheck} label="Bookings / Registrations" to="/dashboard/merchant/bookings" />
         <Item icon={FaCreditCard} label="Payments" to="/dashboard/merchant/payments" />
+        <Item icon={BsGraphUp} label="Event Analytics" to="/dashboard/merchant/analytics" />
+        <Item icon={BsTicket} label="Ticket Validation" to="/dashboard/merchant/ticket-validation" />
+        <Item icon={BsMegaphone} label="Marketing Tools" to="/dashboard/merchant/marketing" />
+        <Item icon={BsBell} label="Notifications" to="/dashboard/merchant/notifications" />
         <Item icon={FaUser} label="Profile" to="/dashboard/merchant/profile" />
         <Item icon={FaCog} label="Settings" to="/dashboard/merchant/settings" />
       </div>

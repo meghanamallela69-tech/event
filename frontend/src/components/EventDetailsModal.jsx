@@ -28,7 +28,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
   
   return (
     <>
-      {/* Full screen overlay to hide page content */}
+      {/* Full screen overlay to completely hide all page content including sidebar and navbar */}
       <div
         style={{
           position: "fixed",
@@ -36,27 +36,65 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          zIndex: 60, // Higher than sidebar (z-50) but lower than modal content
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          zIndex: 9999, // Very high z-index to cover everything
         }}
         onClick={onClose}
       />
       
-      {/* Modal positioned to avoid sidebar */}
+      {/* Modal positioned as full screen */}
       <div
         style={{
           position: "fixed",
-          top: "64px", // Start below the top navbar
-          left: isDashboardLayout ? "256px" : 0, // Start after sidebar in dashboard
+          top: 0,
+          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: "white",
-          zIndex: 70, // Higher than overlay and sidebar
+          zIndex: 10000, // Higher than overlay
           overflow: "hidden",
+          display: "flex",
+          flexDirection: "column"
         }}
       >
-      {/* Modal Content - Full Height */}
-      <div style={{ height: "100%", display: "flex" }}>
+        {/* Custom Modal Header with Close Button */}
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "16px 24px",
+          borderBottom: "1px solid #e5e7eb",
+          backgroundColor: "#f8fafc"
+        }}>
+          <h1 style={{
+            fontSize: "24px",
+            fontWeight: "700",
+            color: "#1f2937"
+          }}>
+            {event.title}
+          </h1>
+          <button
+            onClick={onClose}
+            style={{
+              background: "#ef4444",
+              border: "none",
+              borderRadius: "50%",
+              width: "40px",
+              height: "40px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontSize: "18px",
+              fontWeight: "bold"
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      {/* Modal Content - Full Height with flex layout */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         
         {/* LEFT SIDE - Image Gallery */}
         <div style={{ 
@@ -66,30 +104,6 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
           flexDirection: "column",
           position: "relative"
         }}>
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            style={{
-              position: "absolute",
-              top: "20px",
-              right: "20px",
-              background: "rgba(0, 0, 0, 0.7)",
-              border: "none",
-              borderRadius: "50%",
-              width: "40px",
-              height: "40px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 10,
-              color: "white",
-              fontSize: "18px"
-            }}
-          >
-            ✕
-          </button>
-
           {/* Main Banner Image - 50% height */}
           <div style={{ 
             height: "50%", // Reduced from 60% to 50%
@@ -112,7 +126,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
               left: 0,
               right: 0,
               background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-              padding: "40px 30px 30px",
+              padding: "30px 20px 20px",
               color: "white"
             }}>
               <div style={{
@@ -129,14 +143,6 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
               }}>
                 {status.label}
               </div>
-              <h1 style={{ 
-                fontSize: "32px", 
-                fontWeight: "700", 
-                marginBottom: "8px",
-                textShadow: "0 2px 4px rgba(0,0,0,0.5)"
-              }}>
-                {event.title}
-              </h1>
               <p style={{ 
                 fontSize: "16px", 
                 opacity: 0.9,
@@ -288,14 +294,14 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
           flexDirection: "column",
           borderLeft: "1px solid #e5e7eb"
         }}>
-          {/* Header */}
+          {/* Details Header */}
           <div style={{
-            padding: "24px 32px",
+            padding: "20px 32px",
             borderBottom: "1px solid #e5e7eb",
             backgroundColor: "#fafafa"
           }}>
             <h2 style={{ 
-              fontSize: "24px", 
+              fontSize: "20px", 
               fontWeight: "700", 
               color: "#1f2937",
               marginBottom: "4px"

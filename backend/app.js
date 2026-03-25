@@ -14,6 +14,8 @@ import ratingRouter from "./router/ratingRouter.js";
 import notificationRouter from "./router/notificationRouter.js";
 import couponRouter from "./router/couponRouter.js";
 import followRouter from "./router/followRouter.js";
+import marketingRouter from "./router/marketingRouter.js";
+import analyticsRouter from "./router/analyticsRouter.js";
 import cors from "cors";
 import { ensureAdmin } from "./util/ensureAdmin.js";
 
@@ -45,6 +47,8 @@ app.use("/api/v1/ratings", ratingRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/coupons", couponRouter);
 app.use("/api/v1/follow", followRouter);
+app.use("/api/v1/marketing", marketingRouter);
+app.use("/api/v1/analytics", analyticsRouter);
 
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({ status: "ok" });

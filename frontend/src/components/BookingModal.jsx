@@ -23,6 +23,73 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [useCurrentLocation, setUseCurrentLocation] = useState(false);
   const [address, setAddress] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  const handleCheckboxChange = async (e) => {
+    const checked = e.target.checked;
+    setUseCurrentLocation(checked);
+    
+    if (checked) {
+      // Try to get current location using Leaflet map
+      try {
+        setLocationLoading(true);
+        // Dynamically import Leaflet
+        const L = await import('leaflet');
+        await import('leaflet/dist/leaflet.css');
+        
+        // Create a temporary map container
+        const tempContainer = document.createElement('div');
+        tempContainer.id = 'temp-location-map';
+        tempContainer.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:block;';
+        document.body.appendChild(tempContainer);
+        
+        // Get user's position
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // Initialize map at user's location
+            const map = L.map('temp-location-map').setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Add marker
+            L.marker([lat, lng]).addTo(map)
+              .bindPopup('Your current location')
+              .openPopup();
+            
+            // Show address as coordinates
+            setAddress(`Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`);
+            
+            // Remove map after 2 seconds
+            setTimeout(() => {
+              map.remove();
+              tempContainer.remove();
+              setLocationLoading(false);
+              toast.success('Location acquired!');
+            }, 2000);
+          },
+          (error) => {
+            console.error('Location error:', error);
+            tempContainer.remove();
+            setLocationLoading(false);
+            setUseCurrentLocation(false);
+            toast.error('Unable to get your location. Please enable location services.');
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } catch (err) {
+        console.error('Leaflet import error:', err);
+        setLocationLoading(false);
+        setUseCurrentLocation(false);
+        toast.error('Failed to load map service.');
+      }
+    } else {
+      setAddress('');
+    }
+  };
 
   // Ticketed States - Support multiple ticket types
   const [selectedTickets, setSelectedTickets] = useState({}); // { "Regular": 2, "VIP": 1 }
@@ -174,6 +241,16 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
     }
   };
 
+  // Format time display for user-friendly view
+  const formatTimeDisplay = (timeString) => {
+    if (!timeString) return "";
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   // Apply promo code (optional)
   const handleApplyPromo = () => {
     // If no promo code entered, just return without error
@@ -212,21 +289,28 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
     setLoading(true);
 
     try {
+      console.log("=== FULL SERVICE BOOKING ===");
+      console.log("Service ID:", service._id || service.id);
+      console.log("Event Date:", eventDate);
+      console.log("Time Slot:", timeSlot);
+      console.log("Location:", useCurrentLocation ? "Current Location" : address);
+      
       const finalLocation = useCurrentLocation ? "Current Location" : address;
 
       const bookingData = {
-        serviceId: service._id || service.id,
+        serviceId: (service._id || service.id).toString(), // Ensure String type
         serviceTitle: service.title,
         serviceCategory: service.category,
         servicePrice: basePrice,
         eventType: "full-service",
-        eventDate: `${eventDate} ${timeSlot}`,
+        eventDate: eventDate ? new Date(eventDate) : new Date(), // Convert to Date object
+        eventTime: timeSlot, // Send time separately (24-hour format)
         selectedDate: eventDate,
         selectedTime: timeSlot,
         selectedAddOns: selectedAddons,
         addons: selectedAddons,
         location: finalLocation,
-        locationType: useCurrentLocation ? "current" : "custom",
+        locationType: useCurrentLocation ? "custom" : "custom", // Use "custom" for both cases (schema only allows "event" or "custom")
         totalAmount: fullServiceTotal,
         basePrice: basePrice,
         addonsTotal: addonsTotal,
@@ -236,6 +320,14 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
         notes: "",
         guestCount: 1,
       };
+
+      console.log("Sending booking data:", JSON.stringify(bookingData, null, 2));
+      console.log("API URL:", `${API_BASE}/bookings`);
+      console.log("Data type checks:");
+      console.log("- serviceId:", typeof bookingData.serviceId, bookingData.serviceId);
+      console.log("- eventDate:", bookingData.eventDate instanceof Date ? "Date object" : typeof bookingData.eventDate, bookingData.eventDate);
+      console.log("- eventTime:", typeof bookingData.eventTime, bookingData.eventTime);
+      console.log("- totalAmount:", typeof bookingData.totalAmount, bookingData.totalAmount);
 
       const response = await axios.post(
         `${API_BASE}/bookings`,
@@ -248,10 +340,14 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
         }
       );
 
+      console.log("✅ Booking Response:", response.data);
       toast.success("Booking request sent. Waiting for merchant approval.");
       onSuccess && onSuccess(response.data.booking);
       onClose();
     } catch (error) {
+      console.error("❌ Booking Error:", error);
+      console.error("Response:", error.response?.data);
+      console.error("Status:", error.response?.status);
       const msg = error?.response?.data?.message || "Failed to create booking";
       toast.error(msg);
     } finally {
@@ -336,57 +432,42 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
     );
   }
 
-  // Check if we're in a dashboard layout (has sidebar) or regular page layout
-  const isDashboardLayout = window.location.pathname.includes('/dashboard/');
-  
   return (
-    <>
-      {/* Full screen overlay to hide page content */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          zIndex: 60, // Higher than sidebar (z-50) but lower than modal content
-        }}
-        onClick={onClose}
-      />
-      
-      {/* Modal positioned to avoid sidebar */}
-      <div
-        style={{
-          position: "fixed",
-          top: "64px", // Start below the top navbar
-          left: isDashboardLayout ? "256px" : 0, // Start after sidebar in dashboard
-          right: 0,
-          bottom: 0,
-          backgroundColor: "white",
-          zIndex: 70, // Higher than overlay and sidebar
-          overflow: "hidden",
-        }}
-      >
-      {/* Modal Content - Full Height */}
-      <div style={{ height: "100%", display: "flex" }}>
-        
-        {/* LEFT SIDE - Image Gallery */}
-        <div style={{ 
-          width: "50%", // Fixed 50% width instead of flex: 1
-          backgroundColor: "#f8fafc",
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "white",
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden"
+      }}
+    >
+        {/* Modal Header */}
+        <div style={{
           display: "flex",
-          flexDirection: "column",
-          position: "relative"
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "20px 24px",
+          borderBottom: "1px solid #e5e7eb",
+          backgroundColor: "#f8fafc"
         }}>
-          {/* Close Button */}
+          <h1 style={{
+            fontSize: "24px",
+            fontWeight: "700",
+            color: "#1f2937",
+            margin: 0
+          }}>
+            {service.title}
+          </h1>
           <button
             onClick={onClose}
             style={{
-              position: "absolute",
-              top: "20px",
-              right: "20px",
-              background: "rgba(0, 0, 0, 0.7)",
+              background: "#ef4444",
               border: "none",
               borderRadius: "50%",
               width: "40px",
@@ -395,825 +476,604 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              zIndex: 10,
               color: "white",
-              fontSize: "18px"
+              fontSize: "18px",
+              fontWeight: "bold"
             }}
           >
             ✕
           </button>
+        </div>
 
-          {/* Main Banner Image - Further reduced height */}
+        {/* Modal Body */}
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+          {/* LEFT SIDE - Image Gallery */}
           <div style={{ 
-            height: "50%", // Further reduced from 60% to 50%
-            position: "relative",
-            overflow: "hidden"
+            width: "50%",
+            backgroundColor: "#f8fafc",
+            display: "flex",
+            flexDirection: "column"
           }}>
-            <img 
-              src={service.images?.[0]?.url || "/party.jpg"} 
-              alt={service.title}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover"
-              }}
-            />
-            {/* Overlay with Event Info */}
-            <div style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-              padding: "40px 30px 30px",
-              color: "white"
+            {/* Main Banner Image */}
+            <div style={{ 
+              height: "50%",
+              position: "relative",
+              overflow: "hidden"
             }}>
-              <h1 style={{ 
-                fontSize: "32px", 
-                fontWeight: "700", 
-                marginBottom: "8px",
-                textShadow: "0 2px 4px rgba(0,0,0,0.5)"
+              <img 
+                src={service.images?.[0]?.url || "/party.jpg"} 
+                alt={service.title}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover"
+                }}
+              />
+              {/* Event Info Overlay */}
+              <div style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+                padding: "30px 20px 20px",
+                color: "white"
               }}>
-                {service.title}
-              </h1>
-              <p style={{ 
-                fontSize: "16px", 
-                opacity: 0.9,
-                marginBottom: "12px"
-              }}>
-                {service.category} • {service.location}
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaCalendarAlt />
-                  <span>
-                    {(() => {
-                      // Try multiple date sources
-                      let dateToUse = service.date || service.eventDate || service.createdAt;
-                      
-                      if (dateToUse) {
-                        try {
-                          const date = new Date(dateToUse);
-                          // Check if date is valid
-                          if (!isNaN(date.getTime())) {
-                            return date.toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short", 
-                              day: "numeric",
-                              year: "numeric"
-                            });
-                          }
-                        } catch (e) {
-                          console.error('Date parsing error:', e);
-                        }
-                      }
-                      
-                      // Fallback to a default future date
-                      const futureDate = new Date();
-                      futureDate.setDate(futureDate.getDate() + 7); // 7 days from now
-                      return futureDate.toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short", 
-                        day: "numeric",
-                        year: "numeric"
-                      });
-                    })()}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaClock />
-                  <span>
-                    {(() => {
-                      // Try multiple time sources
-                      let timeToUse = service.time || service.eventTime;
-                      
-                      if (timeToUse && timeToUse !== "TBD") {
-                        try {
-                          // Convert 24-hour format to 12-hour format if needed
-                          if (timeToUse.includes(':') && !timeToUse.includes('M')) {
-                            const [hours, minutes] = timeToUse.split(':');
-                            const hour = parseInt(hours);
-                            const ampm = hour >= 12 ? 'PM' : 'AM';
-                            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                            return `${displayHour}:${minutes} ${ampm}`;
-                          }
-                          return timeToUse;
-                        } catch (e) {
-                          console.error('Time parsing error:', e);
-                        }
-                      }
-                      
-                      // Default time
-                      return "6:00 PM";
-                    })()}
-                  </span>
+                <p style={{ 
+                  fontSize: "16px", 
+                  opacity: 0.9,
+                  marginBottom: "12px",
+                  margin: "0 0 12px 0"
+                }}>
+                  {service.category} • {service.location}
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <FaCalendarAlt />
+                    <span>Mar 31, 2026</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <FaClock />
+                    <span>6:00 PM</span>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Image Gallery */}
+            <div style={{ 
+              height: "50%",
+              padding: "24px",
+              backgroundColor: "white",
+              borderTop: "1px solid #e5e7eb",
+              overflow: "hidden"
+            }}>
+              <h3 style={{ 
+                fontSize: "18px", 
+                fontWeight: "600", 
+                marginBottom: "16px",
+                color: "#374151",
+                margin: "0 0 16px 0"
+              }}>
+                Event Gallery
+              </h3>
+              {service.images && service.images.length > 0 ? (
+                <div style={{ 
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                  gap: "16px",
+                  height: "calc(100% - 50px)",
+                  overflowY: "auto"
+                }}>
+                  {service.images.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image.url}
+                      alt={`${service.title} ${index + 1}`}
+                      style={{
+                        width: "100%",
+                        height: "140px",
+                        objectFit: "cover",
+                        borderRadius: "12px",
+                        cursor: "pointer",
+                        border: "3px solid transparent",
+                        transition: "all 0.3s ease",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "calc(100% - 50px)",
+                  color: "#9ca3af",
+                  fontSize: "14px"
+                }}>
+                  No additional images available
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Image Gallery Thumbnails - Increased size and better layout */}
+          {/* RIGHT SIDE - Booking Form */}
           <div style={{ 
-            height: "50%", // Increased from 40% to 50%
-            padding: "24px",
+            width: "50%",
             backgroundColor: "white",
-            borderTop: "1px solid #e5e7eb",
-            overflow: "hidden"
+            display: "flex",
+            flexDirection: "column",
+            borderLeft: "1px solid #e5e7eb"
           }}>
-            <h3 style={{ 
-              fontSize: "18px", 
-              fontWeight: "600", 
-              marginBottom: "16px",
-              color: "#374151"
+            {/* Form Header */}
+            <div style={{
+              padding: "20px 32px",
+              borderBottom: "1px solid #e5e7eb",
+              backgroundColor: "#fafafa"
             }}>
-              Event Gallery
-            </h3>
-            {service.images && service.images.length > 0 ? (
-              <div style={{ 
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", // Responsive grid
-                gap: "16px",
-                height: "calc(100% - 50px)",
-                overflowY: "auto"
+              <h2 style={{ 
+                fontSize: "20px", 
+                fontWeight: "700", 
+                color: "#1f2937",
+                marginBottom: "4px",
+                margin: "0 0 4px 0"
               }}>
-                {service.images.map((image, index) => (
-                  <img
-                    key={index}
-                    src={image.url}
-                    alt={`${service.title} ${index + 1}`}
-                    style={{
-                      width: "100%",
-                      height: "140px", // Increased from 120px to 140px for even larger thumbnails
-                      objectFit: "cover",
-                      borderRadius: "12px", // Increased border radius
-                      cursor: "pointer",
-                      border: "3px solid transparent", // Thicker border
-                      transition: "all 0.3s ease",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.borderColor = "#a2783a";
-                      e.target.style.transform = "scale(1.05)";
-                      e.target.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.borderColor = "transparent";
-                      e.target.style.transform = "scale(1)";
-                      e.target.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "calc(100% - 50px)",
-                color: "#9ca3af",
-                fontSize: "14px"
+                Book Now
+              </h2>
+              <p style={{ 
+                color: "#6b7280", 
+                fontSize: "14px",
+                margin: 0
               }}>
-                No additional images available
-              </div>
-            )}
-          </div>
-        </div>
+                {isTicketed ? "Select your tickets and complete payment" : "Fill in your details for booking request"}
+              </p>
+            </div>
 
-        {/* RIGHT SIDE - Booking Form */}
-        <div style={{ 
-          width: "50%", // Fixed 50% width instead of 480px
-          backgroundColor: "white",
-          display: "flex",
-          flexDirection: "column",
-          borderLeft: "1px solid #e5e7eb"
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: "24px 32px",
-            borderBottom: "1px solid #e5e7eb",
-            backgroundColor: "#fafafa"
-          }}>
-            <h2 style={{ 
-              fontSize: "24px", 
-              fontWeight: "700", 
-              color: "#1f2937",
-              marginBottom: "4px"
+            {/* Form Container */}
+            <div style={{ 
+              flex: "1", 
+              overflowY: "auto",
+              padding: "32px"
             }}>
-              Book Now
-            </h2>
-            <p style={{ 
-              color: "#6b7280", 
-              fontSize: "14px" 
-            }}>
-              {isTicketed ? "Select your tickets and complete payment" : "Fill in your details for booking request"}
-            </p>
-          </div>
-
-          {/* Form Container */}
-          <div style={{ 
-            flex: "1", 
-            overflowY: "auto",
-            padding: "32px"
-          }}>
-            <form onSubmit={isTicketed ? handleTicketedSubmit : handleFullServiceSubmit}>
-              {isTicketed ? (
-            <>
-              {/* TICKETED EVENT FORM */}
-              
-              {/* 1. Price Section (Top) */}
-              <div style={{ 
-                textAlign: "center", 
-                padding: "20px", 
-                backgroundColor: "#fef3e6", 
-                borderRadius: "12px",
-                marginBottom: "20px",
-                border: "1px solid #a2783a"
-              }}>
-                <div style={{ fontSize: "14px", color: "#6b7280", marginBottom: "4px" }}>
-                  {totalSelectedTickets > 0 ? `Total for ${totalSelectedTickets} tickets` : "Price per ticket"}
-                </div>
-                <div style={{ fontSize: "32px", fontWeight: "700", color: "#a2783a" }}>
-                  {totalSelectedTickets > 0 
-                    ? `₹${ticketedSubtotal.toLocaleString("en-IN")}`
-                    : `₹${(service.price || 2999).toLocaleString("en-IN")}`
-                  }
-                </div>
-              </div>
-
-              {/* 2. Event Details (Display Only) */}
-              <div style={{ marginBottom: "20px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <FaMapMarkerAlt style={{ color: "#ef4444" }} />
-                  <span style={{ color: "#374151", fontSize: "14px" }}>
-                    {service.location || "Event Venue"}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <FaUsers style={{ color: "#a2783a" }} />
-                  <span style={{ color: "#374151", fontSize: "14px" }}>
-                    {availableTickets} / {totalTickets} attendees
-                  </span>
-                </div>
-              </div>
-
-              {/* 3. Ticket Type Selection with Quantities */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaTicketAlt style={{ color: "#a2783a" }} />
-                  Select Tickets
-                </label>
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {ticketTypes.map((ticket) => {
-                    const currentQuantity = selectedTickets[ticket.name] || 0;
-                    
-                    // Safe calculation of available tickets with NaN protection
-                    let available;
-                    if (ticket.quantityAvailable !== undefined) {
-                      available = parseInt(ticket.quantityAvailable) || 0;
-                    } else {
-                      const total = parseInt(ticket.quantityTotal || ticket.quantity) || 0;
-                      const sold = parseInt(ticket.quantitySold) || 0;
-                      available = total - sold;
-                    }
-                    const maxAvailable = Math.max(0, isNaN(available) ? 0 : available);
-                    
-                    return (
-                      <div
-                        key={ticket.name}
-                        style={{
-                          padding: "16px",
-                          backgroundColor: currentQuantity > 0 ? "#fef3e6" : "white",
-                          border: "2px solid",
-                          borderColor: currentQuantity > 0 ? "#a2783a" : "#e5e7eb",
-                          borderRadius: "12px",
-                          transition: "all 0.2s",
-                        }}
-                      >
-                        {/* Ticket Type Header */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <form onSubmit={isTicketed ? handleTicketedSubmit : handleFullServiceSubmit}>
+                {isTicketed ? (
+                  <div>
+                    {/* Ticket Selection Section */}
+                    <div style={{ marginBottom: "24px" }}>
+                      <h3 style={{ 
+                        fontSize: "18px", 
+                        fontWeight: "600", 
+                        color: "#1f2937",
+                        marginBottom: "16px"
+                      }}>
+                        Select Tickets
+                      </h3>
+                      
+                      {ticketTypes.map((ticket) => (
+                        <div
+                          key={ticket.name}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "16px",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "8px",
+                            marginBottom: "12px"
+                          }}
+                        >
                           <div>
-                            <div style={{ color: "#374151", fontWeight: "600", fontSize: "16px" }}>{ticket.name}</div>
-                            <div style={{ color: "#6b7280", fontSize: "12px" }}>
-                              {maxAvailable} tickets available
+                            <div style={{ fontWeight: "600", color: "#374151", marginBottom: "4px" }}>
+                              {ticket.name}
+                            </div>
+                            <div style={{ color: "#6b7280", fontSize: "14px" }}>
+                              ₹{ticket.price.toLocaleString("en-IN")} • Available: {ticket.quantityAvailable}
                             </div>
                           </div>
-                          <div style={{ color: "#a2783a", fontWeight: "700", fontSize: "18px" }}>
-                            ₹{(parseInt(ticket.price) || 0).toLocaleString("en-IN")}
-                          </div>
-                        </div>
-
-                        {/* Quantity Selector */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                             <button
                               type="button"
                               onClick={() => decrementTicket(ticket.name)}
-                              disabled={currentQuantity <= 0}
                               style={{
-                                width: "36px",
-                                height: "36px",
-                                backgroundColor: currentQuantity <= 0 ? "#f3f4f6" : "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "6px",
-                                color: currentQuantity <= 0 ? "#9ca3af" : "#374151",
-                                cursor: currentQuantity <= 0 ? "not-allowed" : "pointer",
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                border: "1px solid #d1d5db",
+                                backgroundColor: "white",
+                                cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                fontSize: "14px",
+                                fontSize: "18px",
+                                color: "#374151"
                               }}
                             >
-                              <FaMinus size={10} />
+                              -
                             </button>
-                            
                             <span style={{ 
-                              fontSize: "18px", 
-                              fontWeight: "600", 
-                              minWidth: "30px", 
-                              textAlign: "center", 
-                              color: "#374151" 
+                              fontSize: "16px", 
+                              fontWeight: "600",
+                              minWidth: "32px",
+                              textAlign: "center"
                             }}>
-                              {currentQuantity}
+                              {selectedTickets[ticket.name] || 0}
                             </span>
-                            
                             <button
                               type="button"
                               onClick={() => incrementTicket(ticket.name)}
-                              disabled={currentQuantity >= maxAvailable}
+                              disabled={selectedTickets[ticket.name] >= ticket.quantityAvailable}
                               style={{
-                                width: "36px",
-                                height: "36px",
-                                backgroundColor: currentQuantity >= maxAvailable ? "#f3f4f6" : "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "6px",
-                                color: currentQuantity >= maxAvailable ? "#9ca3af" : "#374151",
-                                cursor: currentQuantity >= maxAvailable ? "not-allowed" : "pointer",
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                border: "1px solid #d1d5db",
+                                backgroundColor: selectedTickets[ticket.name] >= ticket.quantityAvailable ? "#f3f4f6" : "white",
+                                cursor: selectedTickets[ticket.name] >= ticket.quantityAvailable ? "not-allowed" : "pointer",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                fontSize: "14px",
+                                fontSize: "18px",
+                                color: selectedTickets[ticket.name] >= ticket.quantityAvailable ? "#9ca3af" : "#374151"
                               }}
                             >
-                              <FaPlus size={10} />
+                              +
                             </button>
                           </div>
-
-                          {/* Subtotal for this ticket type */}
-                          {currentQuantity > 0 && (
-                            <div style={{ color: "#6b7280", fontSize: "14px" }}>
-                              ₹{((parseInt(ticket.price) || 0) * currentQuantity).toLocaleString("en-IN")}
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 4. Apply Promo Code (Optional) */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaPercent style={{ color: "#fbbf24" }} />
-                  Apply Promo Code (Optional)
-                </label>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input
-                    type="text"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value)}
-                    placeholder="Enter promo code (optional)"
-                    style={{
-                      flex: 1,
-                      padding: "12px 16px",
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      color: "#374151",
-                      fontSize: "14px",
-                      outline: "none",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyPromo}
-                    disabled={!promoCode || !promoCode.trim()}
-                    style={{
-                      padding: "12px 20px",
-                      backgroundColor: (!promoCode || !promoCode.trim()) ? "#9ca3af" : "#374151",
-                      border: "none",
-                      borderRadius: "8px",
-                      color: "white",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      cursor: (!promoCode || !promoCode.trim()) ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    Apply
-                  </button>
-                  {discount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDiscount(0);
-                        setPromoCode("");
-                        toast.success("Promo code removed");
-                      }}
-                      style={{
-                        padding: "12px 16px",
-                        backgroundColor: "#ef4444",
-                        border: "none",
-                        borderRadius: "8px",
-                        color: "white",
-                        fontSize: "14px",
-                        fontWeight: "500",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {discount > 0 && (
-                  <div style={{ marginTop: "8px", fontSize: "12px", color: "#16a34a" }}>
-                    ✅ Promo code applied! Saved ₹{discount.toLocaleString("en-IN")}
-                  </div>
-                )}
-              </div>
-
-              {/* 5. Total Price Calculation */}
-              {totalSelectedTickets > 0 && (
-                <div style={{ 
-                  backgroundColor: "#f9fafb", 
-                  padding: "16px", 
-                  borderRadius: "8px", 
-                  marginBottom: "20px",
-                  border: "1px solid #e5e7eb"
-                }}>
-                  {/* Breakdown by ticket type */}
-                  {Object.entries(selectedTickets).map(([ticketName, quantity]) => {
-                    const ticket = ticketTypes.find(t => t.name === ticketName);
-                    if (!ticket || quantity === 0) return null;
-                    
-                    return (
-                      <div key={ticketName} style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                        <span style={{ color: "#6b7280", fontSize: "14px" }}>
-                          {ticketName} × {quantity}
-                        </span>
-                        <span style={{ color: "#374151", fontSize: "14px" }}>
-                          ₹{((parseInt(ticket.price) || 0) * quantity).toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  
-                  {discount > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                      <span style={{ color: "#6b7280", fontSize: "14px" }}>Discount:</span>
-                      <span style={{ color: "#16a34a", fontSize: "14px" }}>-₹{discount.toLocaleString("en-IN")}</span>
+                      ))}
                     </div>
-                  )}
-                  
-                  <div style={{ borderTop: "1px solid #e5e7eb", marginTop: "8px", paddingTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "#374151", fontSize: "16px", fontWeight: "600" }}>Total:</span>
-                    <span style={{ color: "#a2783a", fontSize: "24px", fontWeight: "700" }}>
-                      ₹{ticketedTotal.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                </div>
-              )}
 
-              {/* 6. Book Now Button */}
-              <button
-                type="submit"
-                disabled={loading || totalSelectedTickets === 0 || availableTickets === 0}
-                style={{
-                  width: "100%",
-                  padding: "16px 24px",
-                  backgroundColor: loading || totalSelectedTickets === 0 || availableTickets === 0 ? "#9ca3af" : "#a2783a",
-                  color: "white",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: loading || totalSelectedTickets === 0 || availableTickets === 0 ? "not-allowed" : "pointer",
-                  marginBottom: "12px",
-                }}
-              >
-                {loading 
-                  ? "Processing..." 
-                  : availableTickets === 0 
-                    ? "Sold Out"
-                    : totalSelectedTickets === 0
-                      ? "Select Tickets"
-                      : `Book Now – ₹${ticketedTotal.toLocaleString("en-IN")}`
-                }
-              </button>
-
-              {/* Cancel Button */}
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  width: "100%",
-                  padding: "16px 24px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "8px",
-                  color: "#6b7280",
-                  fontSize: "16px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              {/* FULL SERVICE EVENT FORM */}
-              
-              {/* 1. Select Date */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px", display: "block" }}>
-                  Select Date
-                </label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type="date"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    min={today}
-                    required
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      paddingRight: "40px",
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      color: "#374151",
-                      fontSize: "14px",
-                      outline: "none",
-                    }}
-                  />
-                  <FaCalendarAlt style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
-                </div>
-              </div>
-
-              {/* 2. Select Time - 24 Hour Format */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px", display: "block" }}>
-                  Select Time (24-hour format)
-                </label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type="time"
-                    value={timeSlot}
-                    onChange={(e) => setTimeSlot(e.target.value)}
-                    required
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      paddingRight: "40px",
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      color: "#374151",
-                      fontSize: "14px",
-                      outline: "none",
-                    }}
-                  />
-                  <FaClock style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#9ca3af", pointerEvents: "none" }} />
-                </div>
-              </div>
-
-              {/* 3. Optional Add-ons */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "12px", display: "block" }}>
-                  Optional Add-ons
-                </label>
-                {availableAddons.length > 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {availableAddons.map((addon, idx) => {
-                      const isSelected = selectedAddons.find(a => a.name === addon.name);
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => toggleAddon(addon)}
+                    {/* Promo Code Section */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
+                        Have a promo code?
+                      </label>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                          placeholder="Enter code (e.g., EVENT10)"
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 16px",
-                            backgroundColor: isSelected ? "#fef3e6" : "white",
-                            border: "1px solid",
-                            borderColor: isSelected ? "#a2783a" : "#e5e7eb",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                            transition: "all 0.2s",
+                            flex: 1,
+                            padding: "10px 12px",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "6px",
+                            fontSize: "14px"
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyPromo}
+                          style={{
+                            padding: "10px 20px",
+                            backgroundColor: discount > 0 ? "#10b981" : "#a2783a",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            cursor: "pointer"
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            {isSelected ? (
-                              <FaCheckSquare style={{ color: "#a2783a", fontSize: "20px" }} />
-                            ) : (
-                              <FaSquare style={{ color: "#d1d5db", fontSize: "20px" }} />
-                            )}
-                            <span style={{ color: "#374151", fontSize: "14px" }}>{addon.name}</span>
-                          </div>
-                          <span style={{ color: "#a2783a", fontWeight: "600", fontSize: "14px" }}>
-                            +₹{addon.price?.toLocaleString("en-IN")}
-                          </span>
+                          Apply
+                        </button>
+                      </div>
+                      {discount > 0 && (
+                        <div style={{ 
+                          marginTop: "8px", 
+                          padding: "8px", 
+                          backgroundColor: "#d1fae5", 
+                          borderRadius: "6px",
+                          color: "#065f46",
+                          fontSize: "14px"
+                        }}>
+                          Discount applied: ₹{discount.toLocaleString("en-IN")} off
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ 
-                    padding: "16px", 
-                    backgroundColor: "#f9fafb", 
-                    border: "1px dashed #d1d5db",
-                    borderRadius: "8px",
-                    color: "#9ca3af",
-                    fontSize: "14px",
-                    textAlign: "center"
-                  }}>
-                    No add-ons available for this event
-                  </div>
-                )}
-              </div>
+                      )}
+                    </div>
 
-              {/* 4. Service Location */}
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaMapMarkerAlt style={{ color: "#ef4444" }} />
-                  Service Location
-                </label>
-                
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseCurrentLocation(!useCurrentLocation);
-                    if (!useCurrentLocation) {
-                      setAddress("");
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    backgroundColor: useCurrentLocation ? "#fef3e6" : "white",
-                    border: "1px solid",
-                    borderColor: useCurrentLocation ? "#a2783a" : "#e5e7eb",
-                    borderRadius: "8px",
-                    color: useCurrentLocation ? "#a2783a" : "#374151",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    cursor: "pointer",
-                    marginBottom: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <FaMapMarkerAlt />
-                  Use My Current Location
-                </button>
+                    {/* Price Summary */}
+                    <div style={{ 
+                      padding: "16px", 
+                      backgroundColor: "#fef3e6", 
+                      borderRadius: "12px",
+                      marginBottom: "20px",
+                      border: "1px solid #a2783a"
+                    }}>
+                      <div style={{ marginBottom: "8px", paddingBottom: "8px", borderBottom: "1px solid rgba(162, 120, 58, 0.3)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "#92400e", fontSize: "14px", marginBottom: "4px" }}>
+                          <span>Tickets ({totalSelectedTickets})</span>
+                          <span>₹{ticketedSubtotal.toLocaleString("en-IN")}</span>
+                        </div>
+                        {discount > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", color: "#059669", fontSize: "14px" }}>
+                            <span>Discount</span>
+                            <span>-₹{discount.toLocaleString("en-IN")}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "700", color: "#78350f", fontSize: "18px" }}>
+                        <span>Total</span>
+                        <span>₹{ticketedTotal.toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
 
-                {!useCurrentLocation && (
-                  <div style={{ marginBottom: "8px" }}>
-                    <input
-                      type="text"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Enter complete address (street, city, state, pincode)"
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={loading || totalSelectedTickets === 0}
                       style={{
                         width: "100%",
-                        padding: "12px 16px",
-                        backgroundColor: "white",
-                        border: "1px solid #e5e7eb",
+                        padding: "16px 24px",
+                        backgroundColor: loading || totalSelectedTickets === 0 ? "#9ca3af" : "#a2783a",
+                        color: "white",
+                        fontSize: "16px",
+                        fontWeight: "600",
+                        border: "none",
                         borderRadius: "8px",
-                        color: "#374151",
-                        fontSize: "14px",
-                        outline: "none",
-                        marginBottom: "8px",
-                      }}
-                    />
-                    <button 
-                      type="button" 
-                      style={{ 
-                        fontSize: "13px", 
-                        color: "#a2783a", 
-                        background: "none", 
-                        border: "none", 
-                        cursor: "pointer",
-                        padding: 0,
+                        cursor: loading || totalSelectedTickets === 0 ? "not-allowed" : "pointer",
+                        marginBottom: "12px",
                       }}
                     >
-                      Pick location on map
+                      {loading ? "Processing..." : totalSelectedTickets === 0 ? "Select Tickets" : "Book Now"}
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Date Selection */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
+                        <FaCalendarAlt style={{ marginRight: "6px" }} />
+                        Event Date
+                      </label>
+                      <input
+                        type="date"
+                        value={eventDate}
+                        onChange={(e) => setEventDate(e.target.value)}
+                        min={today}
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          border: "1px solid #d1d5db",
+                          borderRadius: "8px",
+                          fontSize: "16px"
+                        }}
+                      />
+                    </div>
+
+                    {/* Time Selection - 24 Hour Format */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
+                        <FaClock style={{ marginRight: "6px" }} />
+                        Select Time (within 24 hours)
+                      </label>
+                      <input
+                        type="time"
+                        value={timeSlot}
+                        onChange={(e) => setTimeSlot(e.target.value)}
+                        min={new Date().toISOString().slice(0, 16)}
+                        style={{
+                          width: "100%",
+                          padding: "12px",
+                          border: "1px solid #d1d5db",
+                          borderRadius: "8px",
+                          fontSize: "16px",
+                          backgroundColor: "white"
+                        }}
+                      />
+                      {timeSlot && (
+                        <div style={{ marginTop: "8px", fontSize: "13px", color: "#6b7280" }}>
+                          Selected time: {formatTimeDisplay(timeSlot)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Addons Selection */}
+                    {availableAddons.length > 0 && (
+                      <div style={{ marginBottom: "20px" }}>
+                        <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
+                          Additional Services
+                        </label>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                          {availableAddons.map((addon, index) => (
+                            <label
+                              key={index}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                padding: "12px",
+                                border: selectedAddons.find(a => a.name === addon.name) ? "2px solid #a2783a" : "1px solid #e5e7eb",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                backgroundColor: selectedAddons.find(a => a.name === addon.name) ? "#fffbeb" : "white"
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!selectedAddons.find(a => a.name === addon.name)}
+                                onChange={() => toggleAddon(addon)}
+                                style={{ marginRight: "12px", width: "18px", height: "18px" }}
+                              />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: "500", color: "#374151" }}>{addon.name}</div>
+                                <div style={{ fontSize: "14px", color: "#6b7280" }}>₹{addon.price?.toLocaleString("en-IN") || 0}</div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Location Type */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "flex", alignItems: "center", marginBottom: "12px", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={useCurrentLocation}
+                          onChange={handleCheckboxChange}
+                          disabled={locationLoading}
+                          style={{ width: "18px", height: "18px", marginRight: "8px" }}
+                        />
+                        <span style={{ fontSize: "14px", fontWeight: "500", color: "#374151" }}>
+                          {locationLoading ? 'Getting location...' : 'Use my current location'}
+                        </span>
+                      </label>
+                      
+                      {!useCurrentLocation && (
+                        <div>
+                          <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
+                            <FaMapMarkerAlt style={{ marginRight: "6px" }} />
+                            Event Address
+                          </label>
+                          <textarea
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            placeholder="Enter your complete address"
+                            rows={3}
+                            style={{
+                              width: "100%",
+                              padding: "12px",
+                              border: "1px solid #d1d5db",
+                              borderRadius: "8px",
+                              fontSize: "14px",
+                              resize: "vertical"
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      {useCurrentLocation && address && (
+                        <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: "8px" }}>
+                          <div style={{ fontSize: "13px", color: "#166534", fontWeight: "500" }}>
+                            📍 Current Location:
+                          </div>
+                          <div style={{ fontSize: "13px", color: "#15803d", fontFamily: "monospace", marginTop: "4px" }}>
+                            {address}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Promo Code Section - Optional */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
+                        <FaPercent style={{ marginRight: "6px" }} />
+                        Promo Code (Optional)
+                      </label>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                          placeholder="Enter code if you have one (e.g., EVENT10)"
+                          style={{
+                            flex: 1,
+                            padding: "10px 12px",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "6px",
+                            fontSize: "14px"
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyPromo}
+                          disabled={!promoCode || !promoCode.trim()}
+                          style={{
+                            padding: "10px 20px",
+                            backgroundColor: discount > 0 ? "#10b981" : "#a2783a",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            cursor: (!promoCode || !promoCode.trim()) ? "not-allowed" : "pointer",
+                            opacity: (!promoCode || !promoCode.trim()) ? 0.6 : 1
+                          }}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                      {!promoCode || !promoCode.trim() ? (
+                        <div style={{ marginTop: "6px", fontSize: "12px", color: "#9ca3af", fontStyle: "italic" }}>
+                          No promo code? Skip this step and continue with booking
+                        </div>
+                      ) : null}
+                      {discount > 0 && (
+                        <div style={{ 
+                          marginTop: "8px", 
+                          padding: "8px", 
+                          backgroundColor: "#d1fae5", 
+                          borderRadius: "6px",
+                          color: "#065f46",
+                          fontSize: "14px"
+                        }}>
+                          Discount applied: ₹{discount.toLocaleString("en-IN")} off
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Price Summary */}
+                    <div style={{ 
+                      padding: "16px", 
+                      backgroundColor: "#f9fafb", 
+                      borderRadius: "8px", 
+                      marginBottom: "20px",
+                      border: "1px solid #e5e7eb"
+                    }}>
+                      <div style={{ marginBottom: "8px", paddingBottom: "8px", borderBottom: "1px solid #e5e7eb" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "#374151", fontSize: "14px", marginBottom: "4px" }}>
+                          <span>Base Price</span>
+                          <span>₹{basePrice.toLocaleString("en-IN")}</span>
+                        </div>
+                        {addonsTotal > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", color: "#374151", fontSize: "14px" }}>
+                            <span>Add-ons ({selectedAddons.length})</span>
+                            <span>₹{addonsTotal.toLocaleString("en-IN")}</span>
+                          </div>
+                        )}
+                        {discount > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", color: "#059669", fontSize: "14px" }}>
+                            <span>Discount</span>
+                            <span>-₹{discount.toLocaleString("en-IN")}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "700", color: "#1f2937", fontSize: "18px" }}>
+                        <span>Total</span>
+                        <span>₹{fullServiceTotal.toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      style={{
+                        width: "100%",
+                        padding: "16px 24px",
+                        backgroundColor: loading ? "#9ca3af" : "#a2783a",
+                        color: "white",
+                        fontSize: "16px",
+                        fontWeight: "600",
+                        border: "none",
+                        borderRadius: "8px",
+                        cursor: loading ? "not-allowed" : "pointer",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      {loading ? "Sending Request..." : "Request Booking"}
                     </button>
                   </div>
                 )}
-              </div>
 
-              {/* 5. Apply Promo Code */}
-              <div style={{ marginBottom: "24px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaPercent style={{ color: "#fbbf24" }} />
-                  Apply Promo Code
-                </label>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input
-                    type="text"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value)}
-                    placeholder="Enter promo code"
-                    style={{
-                      flex: 1,
-                      padding: "12px 16px",
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      color: "#374151",
-                      fontSize: "14px",
-                      outline: "none",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyPromo}
-                    style={{
-                      padding: "12px 20px",
-                      backgroundColor: "#374151",
-                      border: "none",
-                      borderRadius: "8px",
-                      color: "white",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-
-              {/* Price Breakdown */}
-              <div style={{ 
-                backgroundColor: "#f9fafb", 
-                padding: "16px", 
-                borderRadius: "8px", 
-                marginBottom: "20px",
-                border: "1px solid #e5e7eb"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span style={{ color: "#6b7280", fontSize: "14px" }}>Base Price:</span>
-                  <span style={{ color: "#374151", fontSize: "14px" }}>₹{basePrice.toLocaleString("en-IN")}</span>
-                </div>
-                {addonsTotal > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <span style={{ color: "#6b7280", fontSize: "14px" }}>Add-ons:</span>
-                    <span style={{ color: "#374151", fontSize: "14px" }}>+₹{addonsTotal.toLocaleString("en-IN")}</span>
-                  </div>
-                )}
-                {discount > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <span style={{ color: "#6b7280", fontSize: "14px" }}>Discount:</span>
-                    <span style={{ color: "#16a34a", fontSize: "14px" }}>-₹{discount.toLocaleString("en-IN")}</span>
-                  </div>
-                )}
-                <div style={{ borderTop: "1px solid #e5e7eb", marginTop: "8px", paddingTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "#374151", fontSize: "16px", fontWeight: "600" }}>Total:</span>
-                  <span style={{ color: "#a2783a", fontSize: "24px", fontWeight: "700" }}>
-                    ₹{fullServiceTotal.toLocaleString("en-IN")}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: "flex", gap: "12px" }}>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    flex: 1,
-                    padding: "16px 24px",
-                    backgroundColor: loading ? "#9ca3af" : "#a2783a",
-                    color: "white",
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    border: "none",
-                    borderRadius: "8px",
-                    cursor: loading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {loading ? "Sending Request..." : "Request Booking"}
-                </button>
+                {/* Cancel Button */}
                 <button
                   type="button"
                   onClick={onClose}
                   style={{
+                    width: "100%",
                     padding: "16px 24px",
                     backgroundColor: "transparent",
                     border: "1px solid #e5e7eb",
@@ -1226,15 +1086,11 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
                 >
                   Cancel
                 </button>
-              </div>
-            </>
-              )}
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-      </div>
-    </>
   );
 };
 

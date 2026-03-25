@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { RxDashboard } from "react-icons/rx";
-import { BsCalendar2Event } from "react-icons/bs";
-import { FaUsers, FaListAlt, FaStore, FaServicestack } from "react-icons/fa";
+import { BsCalendar2Event, BsBell, BsGraphUp } from "react-icons/bs";
+import { FaUsers, FaListAlt, FaStore, FaCreditCard, FaUser } from "react-icons/fa";
 import { FiSettings, FiLogOut } from "react-icons/fi";
 import PropTypes from "prop-types";
 
@@ -27,11 +27,14 @@ const AdminSidebar = ({ onLogout }) => {
       </div>
       <div role="navigation" className="flex-1 px-2 py-2 space-y-1 overflow-y-auto">
         <Item icon={RxDashboard} label="Dashboard" to="/dashboard/admin" />
-        <Item icon={FaUsers} label="Manage Users" to="/dashboard/admin/users" />
-        <Item icon={FaStore} label="Manage Merchants" to="/dashboard/admin/merchants" />
-        <Item icon={BsCalendar2Event} label="Manage Events" to="/dashboard/admin/events" />
+        <Item icon={FaUsers} label="Users" to="/dashboard/admin/users" />
+        <Item icon={FaStore} label="Merchants" to="/dashboard/admin/merchants" />
+        <Item icon={BsCalendar2Event} label="Events" to="/dashboard/admin/events" />
         <Item icon={FaListAlt} label="Bookings" to="/dashboard/admin/registrations" />
-        <Item icon={FaServicestack} label="Services" to="/dashboard/admin/services" />
+        <Item icon={FaCreditCard} label="Payments" to="/dashboard/admin/payments" />
+        <Item icon={BsGraphUp} label="Analytics" to="/dashboard/admin/analytics" />
+        <Item icon={FaUser} label="Profile" to="/dashboard/admin/profile" />
+        <Item icon={BsBell} label="Notifications" to="/dashboard/admin/notifications" />
         <Item icon={FiSettings} label="Settings" to="/dashboard/admin/settings" />
       </div>
       <div className="p-2 border-t border-gray-200">

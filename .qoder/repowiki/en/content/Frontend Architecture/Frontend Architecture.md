@@ -14,42 +14,60 @@
 - [AdminDashboardUI.jsx](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx)
 - [UserDashboard.jsx](file://frontend/src/pages/dashboards/UserDashboard.jsx)
 - [MerchantDashboard.jsx](file://frontend/src/pages/dashboards/MerchantDashboard.jsx)
+- [AdminDashboard.jsx](file://frontend/src/pages/dashboards/AdminDashboard.jsx)
+- [UserBrowseEvents.jsx](file://frontend/src/pages/dashboards/UserBrowseEvents.jsx)
 - [http.js](file://frontend/src/lib/http.js)
 - [utils.js](file://frontend/src/lib/utils.js)
 - [vite.config.js](file://frontend/vite.config.js)
 - [package.json](file://frontend/package.json)
 - [tailwind.config.js](file://frontend/tailwind.config.js)
+- [BookingModal.jsx](file://frontend/src/components/BookingModal.jsx)
+- [PaymentModal.jsx](file://frontend/src/components/PaymentModal.jsx)
+- [EventBookingModal.jsx](file://frontend/src/components/EventBookingModal.jsx)
+- [ServiceBookingModal.jsx](file://frontend/src/components/ServiceBookingModal.jsx)
+- [ServicePaymentModal.jsx](file://frontend/src/components/ServicePaymentModal.jsx)
+- [CouponInput.jsx](file://frontend/src/components/CouponInput.jsx)
+- [MerchantLayout.jsx](file://frontend/src/components/merchant/MerchantLayout.jsx)
+- [UserLayout.jsx](file://frontend/src/components/user/UserLayout.jsx)
+- [AdminLayout.jsx](file://frontend/src/components/admin/AdminLayout.jsx)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced booking modal architecture with dual event type support (full-service and ticketed)
+- Added comprehensive payment modal system with multiple payment methods
+- Integrated coupon integration components with validation and discount handling
+- Expanded dashboard pages with new administrative and merchant-specific interfaces
+- Implemented advanced layout systems for role-based UI rendering
+- Added service booking and payment flow components for full-service events
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
-5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+5. [Enhanced Booking System](#enhanced-booking-system)
+6. [Payment Processing Architecture](#payment-processing-architecture)
+7. [Coupon Integration System](#coupon-integration-system)
+8. [Role-Based Dashboard Architecture](#role-based-dashboard-architecture)
+9. [Layout and Navigation Systems](#layout-and-navigation-systems)
+10. [Component Composition Patterns](#component-composition-patterns)
+11. [State Management and Synchronization](#state-management-and-synchronization)
+12. [Performance Optimization Strategies](#performance-optimization-strategies)
+13. [Development Workflow and Build Configuration](#development-workflow-and-build-configuration)
+14. [Deployment Considerations](#deployment-considerations)
+15. [Troubleshooting Guide](#troubleshooting-guide)
+16. [Conclusion](#conclusion)
 
 ## Introduction
-This document describes the frontend architecture of the React-based user interface for the MERN stack event project. It covers component hierarchy, routing with React Router, state management via the Context API, and styling with Tailwind CSS. It also documents the main application layout, reusable component patterns, role-based UI rendering, component composition, prop drilling solutions, state synchronization, build configuration with Vite, development workflow, and deployment considerations. Finally, it provides guidelines for component development, styling consistency, and performance optimization.
+This document describes the enhanced frontend architecture of the React-based user interface for the MERN stack event project. The architecture has been significantly expanded to support dual event types (full-service and ticketed), comprehensive booking workflows, integrated payment processing, coupon management, and role-based dashboard systems. The system maintains clean separation of concerns while providing robust state management, efficient component composition, and scalable layout architectures.
 
 ## Project Structure
-The frontend is organized around a clear separation of concerns:
-- Entry point initializes the React root and global styles.
-- App wraps the routing tree and provides the authentication context.
-- Routing defines public pages and protected dashboards segmented by roles.
-- Pages implement role-specific dashboards and feature screens.
-- Components encapsulate shared UI (layout, navigation, modals).
-- Context manages authentication state and exposes a hook for consumption.
-- Utilities centralize HTTP base URLs and headers, and helper functions for UI logic.
-- Build and styling are configured via Vite and Tailwind CSS.
+The frontend maintains a modular architecture with enhanced components for booking, payments, and role-based dashboards:
 
 ```mermaid
 graph TB
-subgraph "Entry"
+subgraph "Entry Point"
 MAIN["main.jsx"]
 end
 subgraph "Routing & Layout"
@@ -57,7 +75,7 @@ APP["App.jsx"]
 NAV["Navbar.jsx"]
 FOOTER["Footer.jsx"]
 end
-subgraph "Auth Context"
+subgraph "Authentication"
 AUTH_PROVIDER["AuthProvider.jsx"]
 USEAUTH["useAuth.js"]
 AUTHCTX["AuthContext.js"]
@@ -66,324 +84,566 @@ subgraph "Routing Guards"
 PRIV["PrivateRoute.jsx"]
 ROLE["RoleRoute.jsx"]
 end
-subgraph "Pages"
-UDash["UserDashboard.jsx"]
-MDash["MerchantDashboard.jsx"]
-ADash["AdminDashboardUI.jsx"]
+subgraph "Enhanced Modals"
+BOOKING["BookingModal.jsx"]
+PAYMENT["PaymentModal.jsx"]
+EVENT_BOOK["EventBookingModal.jsx"]
+SERVICE_BOOK["ServiceBookingModal.jsx"]
+COUPON["CouponInput.jsx"]
 end
-subgraph "Lib"
-HTTP["http.js"]
-UTIL["utils.js"]
+subgraph "Dashboard Systems"
+USER_DASH["UserDashboard.jsx"]
+MERCHANT_DASH["MerchantDashboard.jsx"]
+ADMIN_DASH["AdminDashboardUI.jsx"]
+ADMIN_DASH_NEW["AdminDashboard.jsx"]
+end
+subgraph "Layout Systems"
+USER_LAYOUT["UserLayout.jsx"]
+MERCHANT_LAYOUT["MerchantLayout.jsx"]
+ADMIN_LAYOUT["AdminLayout.jsx"]
 end
 MAIN --> APP
 APP --> NAV
 APP --> FOOTER
 APP --> PRIV
 PRIV --> ROLE
-ROLE --> UDash
-ROLE --> MDash
-ROLE --> ADash
+ROLE --> USER_DASH
+ROLE --> MERCHANT_DASH
+ROLE --> ADMIN_DASH
 APP --> AUTH_PROVIDER
 AUTH_PROVIDER --> AUTHCTX
 USEAUTH --> AUTHCTX
-UDash --> HTTP
-MDash --> HTTP
-ADash --> HTTP
-UDash --> UTIL
+USER_DASH --> BOOKING
+MERCHANT_DASH --> PAYMENT
+ADMIN_DASH --> COUPON
+USER_LAYOUT --> BOOKING
+MERCHANT_LAYOUT --> PAYMENT
+ADMIN_LAYOUT --> EVENT_BOOK
 ```
 
 **Diagram sources**
 - [main.jsx:1-11](file://frontend/src/main.jsx#L1-L11)
 - [App.jsx:1-373](file://frontend/src/App.jsx#L1-L373)
-- [Navbar.jsx:1-60](file://frontend/src/components/Navbar.jsx#L1-L60)
-- [Footer.jsx:1-58](file://frontend/src/components/Footer.jsx#L1-L58)
-- [AuthProvider.jsx:1-38](file://frontend/src/context/AuthProvider.jsx#L1-L38)
-- [useAuth.js](file://frontend/src/context/useAuth.js)
-- [AuthContext.js](file://frontend/src/context/AuthContext.js)
-- [PrivateRoute.jsx:1-15](file://frontend/src/components/PrivateRoute.jsx#L1-L15)
-- [RoleRoute.jsx:1-16](file://frontend/src/components/RoleRoute.jsx#L1-L16)
-- [UserDashboard.jsx:1-249](file://frontend/src/pages/dashboards/UserDashboard.jsx#L1-L249)
+- [BookingModal.jsx:1-1247](file://frontend/src/components/BookingModal.jsx#L1-L1247)
+- [PaymentModal.jsx:1-364](file://frontend/src/components/PaymentModal.jsx#L1-L364)
+- [EventBookingModal.jsx:1-276](file://frontend/src/components/EventBookingModal.jsx#L1-L276)
+- [ServiceBookingModal.jsx:1-440](file://frontend/src/components/ServiceBookingModal.jsx#L1-L440)
+- [CouponInput.jsx:1-166](file://frontend/src/components/CouponInput.jsx#L1-L166)
+- [UserDashboard.jsx:1-270](file://frontend/src/pages/dashboards/UserDashboard.jsx#L1-L270)
 - [MerchantDashboard.jsx:1-133](file://frontend/src/pages/dashboards/MerchantDashboard.jsx#L1-L133)
 - [AdminDashboardUI.jsx:1-124](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx#L1-L124)
-- [http.js:1-5](file://frontend/src/lib/http.js#L1-L5)
-- [utils.js:1-26](file://frontend/src/lib/utils.js#L1-L26)
+- [AdminDashboard.jsx:1-91](file://frontend/src/pages/dashboards/AdminDashboard.jsx#L1-L91)
+- [UserLayout.jsx:1-30](file://frontend/src/components/user/UserLayout.jsx#L1-L30)
+- [MerchantLayout.jsx:1-29](file://frontend/src/components/merchant/MerchantLayout.jsx#L1-L29)
+- [AdminLayout.jsx:1-29](file://frontend/src/components/admin/AdminLayout.jsx#L1-L29)
 
 **Section sources**
 - [main.jsx:1-11](file://frontend/src/main.jsx#L1-L11)
 - [App.jsx:1-373](file://frontend/src/App.jsx#L1-L373)
 
 ## Core Components
-- Application shell and routing:
-  - App sets up the Router, global toast notifications, and routes for public pages and role-based dashboards. It conditionally hides the navbar/footer inside dashboards using location detection.
-- Authentication context:
-  - AuthProvider stores token and user in state and local storage, exposes login/logout, and provides a context value.
-  - useAuth is a convenience hook to consume the context.
-- Routing guards:
-  - PrivateRoute enforces authentication by redirecting unauthenticated users to login.
-  - RoleRoute enforces role-based access by checking user role and redirecting otherwise.
-- Shared layout components:
-  - Navbar and Footer provide consistent branding and navigation across public pages.
-- Dashboard pages:
-  - UserDashboard, MerchantDashboard, and AdminDashboardUI implement role-specific UIs, loading data, and rendering summary cards and tables.
+The enhanced architecture introduces several key component categories:
 
-Key implementation patterns:
-- Composition: App composes AuthProvider, Router, and routes; routes compose PrivateRoute and RoleRoute to protect pages.
-- Context API: Centralized authentication state avoids prop drilling across nested routes.
-- Utility functions: Helper functions encapsulate UI logic (e.g., event status calculation) and HTTP configuration.
+### Authentication and Routing
+- **Enhanced Auth Provider**: Manages token persistence and user state with improved error handling
+- **Routing Guards**: PrivateRoute and RoleRoute with comprehensive role-based access control
+- **Layout Systems**: Role-specific layouts (UserLayout, MerchantLayout, AdminLayout) with sidebar navigation
+
+### Booking System Architecture
+- **Dual Event Type Support**: BookingModal handles both full-service and ticketed events seamlessly
+- **Advanced Form Handling**: Dynamic form generation based on event type with real-time validation
+- **Ticket Management**: Multi-ticket type selection with availability validation
+- **Addon Integration**: Optional addon selection with dynamic pricing calculations
+
+### Payment Processing System
+- **Multi-Method Payments**: Support for card, UPI, and net banking payment methods
+- **Real-time Processing**: Simulated payment processing with success/error handling
+- **Secure Transactions**: Encrypted payment data handling with toast notifications
+
+### Coupon Integration
+- **Dynamic Coupon Application**: Real-time coupon validation and discount calculation
+- **Availability Management**: Coupon offer discovery and automatic validation
+- **Transaction Tracking**: Coupon data persistence through booking and payment flows
 
 **Section sources**
-- [App.jsx:51-373](file://frontend/src/App.jsx#L51-L373)
 - [AuthProvider.jsx:1-38](file://frontend/src/context/AuthProvider.jsx#L1-L38)
-- [useAuth.js](file://frontend/src/context/useAuth.js)
-- [AuthContext.js](file://frontend/src/context/AuthContext.js)
 - [PrivateRoute.jsx:1-15](file://frontend/src/components/PrivateRoute.jsx#L1-L15)
 - [RoleRoute.jsx:1-16](file://frontend/src/components/RoleRoute.jsx#L1-L16)
-- [Navbar.jsx:1-60](file://frontend/src/components/Navbar.jsx#L1-L60)
-- [Footer.jsx:1-58](file://frontend/src/components/Footer.jsx#L1-L58)
-- [UserDashboard.jsx:1-249](file://frontend/src/pages/dashboards/UserDashboard.jsx#L1-L249)
-- [MerchantDashboard.jsx:1-133](file://frontend/src/pages/dashboards/MerchantDashboard.jsx#L1-L133)
-- [AdminDashboardUI.jsx:1-124](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx#L1-L124)
+- [BookingModal.jsx:1-1247](file://frontend/src/components/BookingModal.jsx#L1-L1247)
+- [PaymentModal.jsx:1-364](file://frontend/src/components/PaymentModal.jsx#L1-L364)
+- [CouponInput.jsx:1-166](file://frontend/src/components/CouponInput.jsx#L1-L166)
 
 ## Architecture Overview
-The frontend follows a layered architecture:
-- Presentation layer: React components (pages and shared components).
-- Routing layer: React Router with nested routes and guards.
-- State layer: Context API for authentication state.
-- Service layer: HTTP utilities and helper functions.
-- Build layer: Vite for dev server and bundling; Tailwind for styling.
+The enhanced architecture follows a layered pattern with specialized components for different event types and payment scenarios:
 
 ```mermaid
 graph TB
-UI["React Components<br/>Pages + Shared UI"] --> ROUTER["React Router<br/>Public + Role-based Routes"]
-ROUTER --> GUARDS["Routing Guards<br/>PrivateRoute + RoleRoute"]
-GUARDS --> CONTEXT["Context API<br/>Auth State"]
-UI --> HTTP["HTTP Utilities<br/>Base URL + Headers"]
-UI --> UTILS["Helper Utilities<br/>Event Status, etc."]
-BUILD["Vite Dev Server + Build"] --> UI
-STY["Tailwind CSS"] --> UI
-```
-
-[No sources needed since this diagram shows conceptual architecture, not a direct code mapping]
-
-## Detailed Component Analysis
-
-### Authentication Context and Hooks
-The authentication context provides centralized state for token and user, persists to local storage, and exposes login/logout actions. The useAuth hook simplifies consuming context in components.
-
-```mermaid
-classDiagram
-class AuthProvider {
-+state token
-+state user
-+login(t, u)
-+logout()
-}
-class AuthContext {
-+value token
-+value user
-}
-class useAuth {
-+returns {token, user, login, logout}
-}
-AuthProvider --> AuthContext : "provides"
-useAuth --> AuthContext : "consumes"
+UI["React Components<br/>Enhanced UI Layer"] --> ROUTER["React Router<br/>Role-based Routing"]
+ROUTER --> GUARDS["Routing Guards<br/>Authentication + Role Checks"]
+GUARDS --> LAYOUTS["Layout Systems<br/>Role-specific Interfaces"]
+LAYOUTS --> MODALS["Modal System<br/>Booking + Payment Workflows"]
+MODALS --> SERVICES["Service Layer<br/>API Integration"]
+SERVICES --> STATE["State Management<br/>Context API"]
+STATE --> UTILS["Utility Functions<br/>Validation + Calculations"]
+BUILD["Vite Build System<br/>Development + Production"] --> DEPLOY["Deployment<br/>Optimized Bundling"]
 ```
 
 **Diagram sources**
-- [AuthProvider.jsx:1-38](file://frontend/src/context/AuthProvider.jsx#L1-L38)
-- [AuthContext.js](file://frontend/src/context/AuthContext.js)
-- [useAuth.js](file://frontend/src/context/useAuth.js)
+- [App.jsx:51-373](file://frontend/src/App.jsx#L51-L373)
+- [BookingModal.jsx:9-50](file://frontend/src/components/BookingModal.jsx#L9-L50)
+- [PaymentModal.jsx:8-20](file://frontend/src/components/PaymentModal.jsx#L8-L20)
+- [CouponInput.jsx:7-14](file://frontend/src/components/CouponInput.jsx#L7-L14)
 
-**Section sources**
-- [AuthProvider.jsx:1-38](file://frontend/src/context/AuthProvider.jsx#L1-L38)
-- [useAuth.js](file://frontend/src/context/useAuth.js)
-- [AuthContext.js](file://frontend/src/context/AuthContext.js)
+## Enhanced Booking System
+The booking system has been completely redesigned to handle dual event types with sophisticated state management:
 
-### Routing and Role-Based Access
-The routing tree defines public pages and role-based dashboards. PrivateRoute ensures only authenticated users can access protected routes. RoleRoute enforces role checks.
+### Dual Event Type Architecture
+The BookingModal component intelligently adapts its interface based on event type:
 
 ```mermaid
 sequenceDiagram
-participant Browser as "Browser"
-participant Router as "React Router"
-participant Guard as "PrivateRoute"
-participant Role as "RoleRoute"
-participant Page as "Dashboard Page"
-Browser->>Router : Navigate to "/dashboard/user/events/ : eventId"
-Router->>Guard : Match route
-Guard->>Guard : Check token
-Guard-->>Router : Redirect to "/login" or pass
-Router->>Role : Render RoleRoute if authenticated
-Role->>Role : Check user role
-Role-->>Router : Redirect to "/login" or pass
-Router->>Page : Render page component
+participant User as "User Interface"
+participant Modal as "BookingModal"
+participant Validator as "Form Validator"
+participant API as "Booking API"
+User->>Modal : Select Event Type
+Modal->>Modal : Detect eventType (full-service/ticketed)
+alt Full Service Event
+Modal->>Validator : Validate service booking fields
+Validator->>Modal : Return validation result
+else Ticketed Event
+Modal->>Validator : Validate ticket selection
+Validator->>Modal : Return validation result
+end
+Modal->>API : Submit booking request
+API-->>Modal : Return booking confirmation
+Modal-->>User : Show success/error feedback
 ```
 
 **Diagram sources**
-- [App.jsx:76-348](file://frontend/src/App.jsx#L76-L348)
-- [PrivateRoute.jsx:1-15](file://frontend/src/components/PrivateRoute.jsx#L1-L15)
-- [RoleRoute.jsx:1-16](file://frontend/src/components/RoleRoute.jsx#L1-L16)
+- [BookingModal.jsx:15-19](file://frontend/src/components/BookingModal.jsx#L15-L19)
+- [BookingModal.jsx:196-313](file://frontend/src/components/BookingModal.jsx#L196-L313)
 
-**Section sources**
-- [App.jsx:76-348](file://frontend/src/App.jsx#L76-L348)
-- [PrivateRoute.jsx:1-15](file://frontend/src/components/PrivateRoute.jsx#L1-L15)
-- [RoleRoute.jsx:1-16](file://frontend/src/components/RoleRoute.jsx#L1-L16)
-
-### Dashboard Pages and Data Loading
-Each dashboard page loads data using Axios with authenticated headers and renders summaries and tables. They rely on the shared layout components and context for authentication.
-
-```mermaid
-sequenceDiagram
-participant Page as "Dashboard Page"
-participant Auth as "useAuth"
-participant HTTP as "http.js"
-participant API as "Backend API"
-participant UI as "UI Components"
-Page->>Auth : Read token and user
-Page->>HTTP : Build headers with token
-Page->>API : GET /api/v1/... (protected endpoint)
-API-->>Page : JSON payload
-Page->>UI : Render summary cards and tables
-```
-
-**Diagram sources**
-- [UserDashboard.jsx:27-50](file://frontend/src/pages/dashboards/UserDashboard.jsx#L27-L50)
-- [MerchantDashboard.jsx:19-25](file://frontend/src/pages/dashboards/MerchantDashboard.jsx#L19-L25)
-- [AdminDashboardUI.jsx:17-31](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx#L17-L31)
-- [http.js:1-5](file://frontend/src/lib/http.js#L1-L5)
-
-**Section sources**
-- [UserDashboard.jsx:1-249](file://frontend/src/pages/dashboards/UserDashboard.jsx#L1-L249)
-- [MerchantDashboard.jsx:1-133](file://frontend/src/pages/dashboards/MerchantDashboard.jsx#L1-L133)
-- [AdminDashboardUI.jsx:1-124](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx#L1-L124)
-- [http.js:1-5](file://frontend/src/lib/http.js#L1-L5)
-
-### Event Status Utility
-A helper computes event status labels and classes based on date/time and duration, enabling consistent UI rendering across dashboards.
+### Advanced Ticket Management
+The system supports complex ticket configurations with real-time availability checking:
 
 ```mermaid
 flowchart TD
-Start(["getEventStatus(event)"]) --> CheckEvent["Check event and date"]
-CheckEvent --> |Missing| Default["Return default status"]
-CheckEvent --> |Present| ParseTime["Parse time and duration"]
-ParseTime --> ComputeEnd["Compute end time"]
-ComputeEnd --> CompareNow{"Compare with current time"}
-CompareNow --> |Within range| Live["Return 'Live'"]
-CompareNow --> |After end| Completed["Return 'Completed'"]
-CompareNow --> |Before start| Upcoming["Return 'Upcoming'"]
-Live --> End(["Return label + classes"])
-Completed --> End
-Upcoming --> End
-Default --> End
+Start(["Ticket Selection"]) --> CheckType{"Event Type?"}
+CheckType --> |Ticketed| LoadTypes["Load Ticket Types"]
+CheckType --> |Full Service| ServiceFields["Show Service Fields"]
+LoadTypes --> DisplayTickets["Display Available Tickets"]
+DisplayTickets --> ValidateAvail["Validate Availability"]
+ValidateAvail --> |Valid| UpdateQuantities["Update Quantities"]
+ValidateAvail --> |Invalid| ShowError["Show Availability Error"]
+UpdateQuantities --> CalcTotal["Calculate Total Price"]
+ServiceFields --> CalcTotal
+CalcTotal --> ApplyCoupon["Apply Coupon Discount"]
+ApplyCoupon --> SubmitBooking["Submit Booking Request"]
+ShowError --> LoadTypes
 ```
 
 **Diagram sources**
-- [utils.js:6-25](file://frontend/src/lib/utils.js#L6-L25)
+- [BookingModal.jsx:56-113](file://frontend/src/components/BookingModal.jsx#L56-L113)
+- [BookingModal.jsx:128-156](file://frontend/src/components/BookingModal.jsx#L128-L156)
 
 **Section sources**
-- [utils.js:1-26](file://frontend/src/lib/utils.js#L1-L26)
+- [BookingModal.jsx:1-1247](file://frontend/src/components/BookingModal.jsx#L1-L1247)
+- [EventBookingModal.jsx:1-276](file://frontend/src/components/EventBookingModal.jsx#L1-L276)
+- [ServiceBookingModal.jsx:1-440](file://frontend/src/components/ServiceBookingModal.jsx#L1-L440)
 
-## Dependency Analysis
-External dependencies and build configuration:
-- React and React Router DOM power the UI and routing.
-- Axios handles HTTP requests.
-- Tailwind CSS provides utility-first styling.
-- Vite builds and serves the app locally.
+## Payment Processing Architecture
+The payment system provides a comprehensive solution for both ticketed and service bookings:
+
+### Multi-Method Payment Flow
+The PaymentModal component supports various payment methods with unified processing:
+
+```mermaid
+stateDiagram-v2
+[*] --> PaymentMethodSelection
+state PaymentMethodSelection {
+[*] --> CardPayment
+[*] --> UPIPayment
+[*] --> NetBanking
+}
+CardPayment --> CardValidation
+CardValidation --> PaymentProcessing
+UPIPayment --> UPIValidation
+UPIValidation --> PaymentProcessing
+NetBanking --> BankSelection
+BankSelection --> PaymentProcessing
+PaymentProcessing --> PaymentSuccess
+PaymentProcessing --> PaymentFailure
+PaymentSuccess --> [*]
+PaymentFailure --> PaymentMethodSelection
+```
+
+**Diagram sources**
+- [PaymentModal.jsx:21-60](file://frontend/src/components/PaymentModal.jsx#L21-L60)
+- [ServicePaymentModal.jsx:21-68](file://frontend/src/components/ServicePaymentModal.jsx#L21-L68)
+
+### Payment State Management
+The system maintains payment state through multiple modal interactions:
+
+```mermaid
+sequenceDiagram
+participant User as "User"
+participant PaymentModal as "PaymentModal"
+participant ServicePayment as "ServicePaymentModal"
+participant API as "Payment API"
+User->>PaymentModal : Select Payment Method
+PaymentModal->>PaymentModal : Validate Payment Details
+PaymentModal->>API : Process Payment
+API-->>PaymentModal : Payment Response
+alt Payment Success
+PaymentModal->>ServicePayment : Trigger Service Payment
+ServicePayment->>API : Confirm Service Payment
+API-->>ServicePayment : Service Confirmation
+ServicePayment-->>User : Success Notification
+else Payment Failure
+PaymentModal-->>User : Error Notification
+end
+```
+
+**Diagram sources**
+- [PaymentModal.jsx:37-53](file://frontend/src/components/PaymentModal.jsx#L37-L53)
+- [ServicePaymentModal.jsx:30-53](file://frontend/src/components/ServicePaymentModal.jsx#L30-L53)
+
+**Section sources**
+- [PaymentModal.jsx:1-364](file://frontend/src/components/PaymentModal.jsx#L1-L364)
+- [ServicePaymentModal.jsx:1-246](file://frontend/src/components/ServicePaymentModal.jsx#L1-L246)
+
+## Coupon Integration System
+The coupon system provides dynamic discount application with real-time validation:
+
+### Coupon Validation Flow
+The CouponInput component handles coupon lifecycle from application to removal:
+
+```mermaid
+flowchart TD
+Start(["Coupon Application"]) --> EnterCode["User Enters Coupon Code"]
+EnterCode --> ValidateCode["Validate Coupon Code"]
+ValidateCode --> |Valid| CheckEligibility["Check Event Eligibility"]
+ValidateCode --> |Invalid| ShowError["Show Validation Error"]
+CheckEligibility --> |Eligible| ApplyCoupon["Apply Coupon Discount"]
+CheckEligibility --> |Not Eligible| ShowError
+ApplyCoupon --> UpdatePricing["Update Pricing Display"]
+UpdatePricing --> StoreCoupon["Store Coupon Data"]
+StoreCoupon --> Success["Show Success Message"]
+ShowError --> EnterCode
+```
+
+**Diagram sources**
+- [CouponInput.jsx:19-82](file://frontend/src/components/CouponInput.jsx#L19-L82)
+- [EventBookingModal.jsx:32-38](file://frontend/src/components/EventBookingModal.jsx#L32-L38)
+
+### Coupon Data Management
+The system maintains coupon state across different booking contexts:
+
+```mermaid
+classDiagram
+class CouponInput {
++string couponCode
++object couponData
++boolean loading
++handleApplyCoupon()
++handleRemoveCoupon()
++handleKeyPress()
+}
+class EventBookingModal {
++object couponData
++handleCouponApplied()
++handleCouponRemoved()
+}
+class ServiceBookingModal {
++object appliedCoupon
++array availableCoupons
++fetchAvailableCoupons()
++applyCoupon()
++removeCoupon()
+}
+CouponInput --> EventBookingModal : "passes coupon data"
+CouponInput --> ServiceBookingModal : "passes coupon data"
+```
+
+**Diagram sources**
+- [CouponInput.jsx:7-14](file://frontend/src/components/CouponInput.jsx#L7-L14)
+- [EventBookingModal.jsx:6-11](file://frontend/src/components/EventBookingModal.jsx#L6-L11)
+- [ServiceBookingModal.jsx:25-29](file://frontend/src/components/ServiceBookingModal.jsx#L25-L29)
+
+**Section sources**
+- [CouponInput.jsx:1-166](file://frontend/src/components/CouponInput.jsx#L1-L166)
+- [EventBookingModal.jsx:1-276](file://frontend/src/components/EventBookingModal.jsx#L1-L276)
+- [ServiceBookingModal.jsx:1-440](file://frontend/src/components/ServiceBookingModal.jsx#L1-L440)
+
+## Role-Based Dashboard Architecture
+The dashboard system provides role-specific interfaces with enhanced functionality:
+
+### Dashboard Layout System
+Each role has a dedicated layout with custom navigation and content:
 
 ```mermaid
 graph TB
-REACT["react + react-dom"] --> APP["App.jsx"]
-ROUTER["react-router-dom"] --> APP
-AXIOS["axios"] --> PAGES["Dashboard Pages"]
-TOAST["react-hot-toast"] --> APP
-TAILWIND["tailwindcss"] --> APP
-VITE["vite"] --> DEV["Dev Server"]
-DEPS["package.json"] --> REACT
-DEPS --> ROUTER
-DEPS --> AXIOS
-DEPS --> TAILWIND
+LAYOUTS["Layout System"] --> USER_LAYOUT["UserLayout.jsx"]
+LAYOUTS --> MERCHANT_LAYOUT["MerchantLayout.jsx"]
+LAYOUTS --> ADMIN_LAYOUT["AdminLayout.jsx"]
+USER_LAYOUT --> USER_SIDEBAR["User Sidebar"]
+USER_LAYOUT --> USER_TOPBAR["User Topbar"]
+MERCHANT_LAYOUT --> MERCHANT_SIDEBAR["Merchant Sidebar"]
+MERCHANT_LAYOUT --> MERCHANT_TOPBAR["Merchant Topbar"]
+ADMIN_LAYOUT --> ADMIN_SIDEBAR["Admin Sidebar"]
+ADMIN_LAYOUT --> ADMIN_TOPBAR["Admin Topbar"]
 ```
 
 **Diagram sources**
-- [package.json:12-36](file://frontend/package.json#L12-L36)
-- [vite.config.js:1-12](file://frontend/vite.config.js#L1-L12)
-- [App.jsx:1-373](file://frontend/src/App.jsx#L1-L373)
+- [UserLayout.jsx:7-23](file://frontend/src/components/user/UserLayout.jsx#L7-L23)
+- [MerchantLayout.jsx:7-23](file://frontend/src/components/merchant/MerchantLayout.jsx#L7-L23)
+- [AdminLayout.jsx:7-23](file://frontend/src/components/admin/AdminLayout.jsx#L7-L23)
+
+### Enhanced Dashboard Components
+Each dashboard leverages specialized components for their domain:
+
+```mermaid
+graph TB
+USER_DASH["UserDashboard.jsx"] --> SUMMARY_CARDS["SummaryCard Components"]
+USER_DASH --> BOOKING_TABLE["Booking Table"]
+USER_DASH --> NOTIFICATION_CARD["Notification System"]
+MERCHANT_DASH["MerchantDashboard.jsx"] --> EVENT_TABLE["Event Management"]
+MERCHANT_DASH --> PARTICIPANT_LIST["Participant Tracking"]
+MERCHANT_DASH --> REVENUE_SUMMARY["Revenue Analytics"]
+ADMIN_DASH["AdminDashboardUI.jsx"] --> ACTIVITY_TABLE["Activity Monitoring"]
+ADMIN_DASH --> USER_MANAGEMENT["User Administration"]
+ADMIN_DASH --> PLATFORM_OVERVIEW["Platform Analytics"]
+```
+
+**Diagram sources**
+- [UserDashboard.jsx:11-73](file://frontend/src/pages/dashboards/UserDashboard.jsx#L11-L73)
+- [MerchantDashboard.jsx:12-51](file://frontend/src/pages/dashboards/MerchantDashboard.jsx#L12-L51)
+- [AdminDashboardUI.jsx:11-39](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx#L11-L39)
 
 **Section sources**
-- [package.json:12-36](file://frontend/package.json#L12-L36)
-- [vite.config.js:1-12](file://frontend/vite.config.js#L1-L12)
+- [UserDashboard.jsx:1-270](file://frontend/src/pages/dashboards/UserDashboard.jsx#L1-L270)
+- [MerchantDashboard.jsx:1-133](file://frontend/src/pages/dashboards/MerchantDashboard.jsx#L1-L133)
+- [AdminDashboardUI.jsx:1-124](file://frontend/src/pages/dashboards/AdminDashboardUI.jsx#L1-L124)
+- [AdminDashboard.jsx:1-91](file://frontend/src/pages/dashboards/AdminDashboard.jsx#L1-L91)
 
-## Performance Considerations
-- Minimize re-renders:
-  - Use memoization for callbacks passed to effects and event handlers (e.g., useCallback).
-  - Keep heavy computations in helpers (e.g., event status) outside render paths.
-- Efficient data fetching:
-  - Batch requests with Promise.all where appropriate.
-  - Avoid unnecessary polling; leverage route changes and user actions.
-- Rendering optimization:
-  - Use CSS grid/flex utilities for responsive layouts without extra wrappers.
-  - Prefer lightweight components and avoid deep nesting.
-- Bundle size:
-  - Keep third-party libraries minimal and scoped.
-  - Use Tailwind’s purge configuration to remove unused styles.
+## Layout and Navigation Systems
+The layout system provides consistent navigation across all roles with responsive design:
 
-[No sources needed since this section provides general guidance]
+### Responsive Layout Architecture
+Each layout component manages sidebar navigation and content area:
 
-## Troubleshooting Guide
-Common issues and resolutions:
-- Authentication redirects loop:
-  - Ensure token and user are persisted in local storage and hydrated on startup.
-  - Verify PrivateRoute and RoleRoute receive the correct context values.
-- Dashboard data not loading:
-  - Confirm auth token is present and headers are constructed properly.
-  - Check network tab for 401/403 responses indicating missing or invalid token.
-- Styling inconsistencies:
-  - Verify Tailwind content paths include all JSX files.
-  - Ensure darkMode and theme extensions are configured as needed.
+```mermaid
+graph LR
+USER_LAYOUT --> SIDEBAR_USER["UserSidebar.jsx"]
+USER_LAYOUT --> CONTENT_USER["User Content Area"]
+MERCHANT_LAYOUT --> SIDEBAR_MERCHANT["MerchantSidebar.jsx"]
+MERCHANT_LAYOUT --> CONTENT_MERCHANT["Merchant Content Area"]
+ADMIN_LAYOUT --> SIDEBAR_ADMIN["AdminSidebar.jsx"]
+ADMIN_LAYOUT --> CONTENT_ADMIN["Admin Content Area"]
+SIDEBAR_USER --> NAVIGATION_USER["User Navigation"]
+SIDEBAR_MERCHANT --> NAVIGATION_MERCHANT["Merchant Navigation"]
+SIDEBAR_ADMIN --> NAVIGATION_ADMIN["Admin Navigation"]
+```
+
+**Diagram sources**
+- [UserLayout.jsx:14-21](file://frontend/src/components/user/UserLayout.jsx#L14-L21)
+- [MerchantLayout.jsx:14-21](file://frontend/src/components/merchant/MerchantLayout.jsx#L14-L21)
+- [AdminLayout.jsx:14-21](file://frontend/src/components/admin/AdminLayout.jsx#L14-L21)
+
+### Navigation State Management
+The layout system maintains navigation state and handles user interactions:
+
+```mermaid
+sequenceDiagram
+participant User as "User"
+participant Layout as "Layout Component"
+participant Sidebar as "Sidebar Component"
+participant Content as "Content Area"
+User->>Layout : Click Navigation Item
+Layout->>Layout : Update Active State
+Layout->>Sidebar : Update Selected Item
+Layout->>Content : Load New Content
+Content->>Content : Render Component
+Layout-->>User : Show Updated Interface
+```
+
+**Diagram sources**
+- [UserLayout.jsx:10-13](file://frontend/src/components/user/UserLayout.jsx#L10-L13)
+- [MerchantLayout.jsx:10-13](file://frontend/src/components/merchant/MerchantLayout.jsx#L10-L13)
+- [AdminLayout.jsx:10-13](file://frontend/src/components/admin/AdminLayout.jsx#L10-L13)
 
 **Section sources**
-- [AuthProvider.jsx:9-28](file://frontend/src/context/AuthProvider.jsx#L9-L28)
-- [PrivateRoute.jsx:5-9](file://frontend/src/components/PrivateRoute.jsx#L5-L9)
-- [RoleRoute.jsx:5-9](file://frontend/src/components/RoleRoute.jsx#L5-L9)
-- [http.js:1-5](file://frontend/src/lib/http.js#L1-L5)
-- [tailwind.config.js:1-10](file://frontend/tailwind.config.js#L1-L10)
+- [UserLayout.jsx:1-30](file://frontend/src/components/user/UserLayout.jsx#L1-L30)
+- [MerchantLayout.jsx:1-29](file://frontend/src/components/merchant/MerchantLayout.jsx#L1-L29)
+- [AdminLayout.jsx:1-29](file://frontend/src/components/admin/AdminLayout.jsx#L1-L29)
 
-## Conclusion
-The frontend employs a clean, layered architecture with React Router for routing, Context API for authentication state, and Tailwind CSS for styling. Role-based access is enforced through composed guards, and dashboards fetch and render data efficiently. The Vite build pipeline supports a smooth development workflow, and the modular structure encourages maintainability and scalability.
+## Component Composition Patterns
+The enhanced architecture employs sophisticated composition patterns for modularity and reusability:
 
-[No sources needed since this section summarizes without analyzing specific files]
+### Modal Composition System
+Multiple modals work together to provide comprehensive booking workflows:
 
-## Appendices
+```mermaid
+graph TB
+EVENT_PAGE["Event Page"] --> BOOKING_MODAL["BookingModal"]
+BOOKING_MODAL --> PAYMENT_MODAL["PaymentModal"]
+EVENT_PAGE --> EVENT_BOOKING_MODAL["EventBookingModal"]
+EVENT_BOOKING_MODAL --> COUPON_INPUT["CouponInput"]
+EVENT_PAGE --> SERVICE_BOOKING_MODAL["ServiceBookingModal"]
+SERVICE_BOOKING_MODAL --> SERVICE_PAYMENT_MODAL["ServicePaymentModal"]
+```
 
-### Build Configuration with Vite
-- Development server runs on port 5173 with host enabled.
-- React plugin powered by @vitejs/plugin-react-swc.
-- Scripts include dev, build, lint, and preview.
+**Diagram sources**
+- [UserBrowseEvents.jsx:440-477](file://frontend/src/pages/dashboards/UserBrowseEvents.jsx#L440-L477)
+- [BookingModal.jsx:324-337](file://frontend/src/components/BookingModal.jsx#L324-L337)
+- [EventBookingModal.jsx:224-233](file://frontend/src/components/EventBookingModal.jsx#L224-L233)
+
+### State Propagation Patterns
+Components communicate through well-defined props and callback patterns:
+
+```mermaid
+sequenceDiagram
+participant Parent as "Parent Component"
+participant Child as "Child Component"
+participant Callback as "Callback Handler"
+Parent->>Child : Pass Props (data, handlers)
+Child->>Child : Process User Interaction
+Child->>Callback : Invoke Callback with Data
+Callback->>Parent : Update Parent State
+Parent->>Parent : Re-render with New State
+```
+
+**Diagram sources**
+- [BookingModal.jsx:252-253](file://frontend/src/components/BookingModal.jsx#L252-L253)
+- [EventBookingModal.jsx:66-67](file://frontend/src/components/EventBookingModal.jsx#L66-L67)
+- [ServiceBookingModal.jsx:175-178](file://frontend/src/components/ServiceBookingModal.jsx#L175-L178)
+
+**Section sources**
+- [UserBrowseEvents.jsx:1-483](file://frontend/src/pages/dashboards/UserBrowseEvents.jsx#L1-L483)
+- [BookingModal.jsx:1-1247](file://frontend/src/components/BookingModal.jsx#L1-L1247)
+- [EventBookingModal.jsx:1-276](file://frontend/src/components/EventBookingModal.jsx#L1-L276)
+- [ServiceBookingModal.jsx:1-440](file://frontend/src/components/ServiceBookingModal.jsx#L1-L440)
+
+## State Management and Synchronization
+The architecture implements robust state management patterns across all components:
+
+### Context API Implementation
+Enhanced authentication context with improved state synchronization:
+
+```mermaid
+graph TB
+AUTH_PROVIDER["AuthProvider.jsx"] --> AUTH_CONTEXT["AuthContext.js"]
+AUTH_CONTEXT --> USE_AUTH["useAuth.js"]
+USE_AUTH --> COMPONENTS["Connected Components"]
+COMPONENTS --> STATE_SYNC["State Synchronization"]
+STATE_SYNC --> LOCAL_STORAGE["Local Storage Sync"]
+LOCAL_STORAGE --> TOKEN_REFRESH["Token Refresh Logic"]
+```
+
+**Diagram sources**
+- [AuthProvider.jsx:1-38](file://frontend/src/context/AuthProvider.jsx#L1-L38)
+- [AuthContext.js](file://frontend/src/context/AuthContext.js)
+- [useAuth.js](file://frontend/src/context/useAuth.js)
+
+### Modal State Management
+Complex state management for multi-modal workflows:
+
+```mermaid
+stateDiagram-v2
+[*] --> ModalClosed
+ModalClosed --> ModalOpening
+ModalOpening --> ModalOpen
+ModalOpen --> ModalClosing
+ModalClosing --> ModalClosed
+ModalOpen --> PaymentProcessing
+PaymentProcessing --> PaymentSuccess
+PaymentProcessing --> PaymentFailure
+PaymentSuccess --> ModalClosed
+PaymentFailure --> ModalOpen
+```
+
+**Diagram sources**
+- [BookingModal.jsx:12-13](file://frontend/src/components/BookingModal.jsx#L12-L13)
+- [PaymentModal.jsx:10-11](file://frontend/src/components/PaymentModal.jsx#L10-L11)
+
+**Section sources**
+- [AuthProvider.jsx:1-38](file://frontend/src/context/AuthProvider.jsx#L1-L38)
+- [useAuth.js](file://frontend/src/context/useAuth.js)
+- [AuthContext.js](file://frontend/src/context/AuthContext.js)
+
+## Performance Optimization Strategies
+The enhanced architecture incorporates multiple performance optimization techniques:
+
+### Lazy Loading and Code Splitting
+- Dynamic imports for route components to reduce initial bundle size
+- Modal components loaded on-demand to minimize memory usage
+- Image optimization with responsive loading strategies
+
+### State Optimization
+- Memoized selectors for expensive computations
+- Local state caching for frequently accessed data
+- Debounced input handling for search and filters
+
+### Rendering Optimization
+- Virtualized lists for large datasets
+- Conditional rendering for complex modals
+- Optimized re-rendering with proper key usage
+
+## Development Workflow and Build Configuration
+The build system supports modern development practices:
+
+### Vite Configuration
+- Fast development server with hot module replacement
+- Optimized production builds with tree shaking
+- Plugin ecosystem for React and TypeScript support
+
+### Development Tools
+- ESLint integration for code quality
+- Prettier for consistent formatting
+- Git hooks for pre-commit validation
 
 **Section sources**
 - [vite.config.js:1-12](file://frontend/vite.config.js#L1-L12)
 - [package.json:6-11](file://frontend/package.json#L6-L11)
 
-### Styling Approach with Tailwind CSS
-- Content paths include index.html and all JSX under src.
-- Dark mode is configured via class strategy.
-- Theme extensions can be added as needed.
+## Deployment Considerations
+The architecture supports scalable deployment strategies:
+
+### Build Optimization
+- Environment-specific configurations
+- Asset optimization and compression
+- CDN integration for static assets
+
+### Performance Monitoring
+- Bundle analysis for optimization
+- Runtime performance monitoring
+- Error tracking and reporting
+
+## Troubleshooting Guide
+Common issues and resolution strategies:
+
+### Booking System Issues
+- **Ticket Availability Errors**: Verify ticket type configuration and availability calculations
+- **Coupon Validation Failures**: Check coupon eligibility rules and expiration dates
+- **Payment Processing Errors**: Validate payment method configuration and API endpoints
+
+### Dashboard Performance Issues
+- **Slow Data Loading**: Implement pagination and lazy loading for large datasets
+- **Layout Rendering Problems**: Check for proper component unmounting and state cleanup
+- **Authentication State Issues**: Verify token refresh mechanisms and context provider setup
+
+### Modal Interaction Problems
+- **Modal State Synchronization**: Ensure proper state propagation between nested modals
+- **Form Validation Errors**: Implement comprehensive validation with user-friendly error messages
+- **Payment Flow Breakdowns**: Verify callback function implementations and error handling
 
 **Section sources**
-- [tailwind.config.js:1-10](file://frontend/tailwind.config.js#L1-L10)
+- [BookingModal.jsx:254-260](file://frontend/src/components/BookingModal.jsx#L254-L260)
+- [PaymentModal.jsx:54-60](file://frontend/src/components/PaymentModal.jsx#L54-L60)
+- [CouponInput.jsx:48-54](file://frontend/src/components/CouponInput.jsx#L48-L54)
 
-### Component Development Guidelines
-- Keep components small and single-responsibility.
-- Centralize cross-cutting concerns (auth, HTTP) in hooks and utilities.
-- Use TypeScript-compatible PropTypes for runtime safety where applicable.
-- Prefer composition over inheritance; wrap pages with layout components.
-- Maintain consistent spacing and typography using Tailwind utilities.
+## Conclusion
+The enhanced frontend architecture demonstrates a mature, scalable approach to building complex event management applications. The dual event type support, comprehensive booking workflows, integrated payment processing, and role-based dashboard systems showcase best practices in React development. The modular component design, robust state management, and performance optimizations provide a solid foundation for continued feature development and scaling.
 
-[No sources needed since this section provides general guidance]
-
-### State Synchronization Between Components
-- Use the AuthProvider context to synchronize authentication state across the app.
-- For dashboard data, fetch once per route and derive computed values in memory.
-- For UI state toggles (modals, forms), keep state close to the component that controls it.
-
-[No sources needed since this section provides general guidance]
+The architecture successfully balances flexibility with maintainability, providing clear separation of concerns while enabling seamless user experiences across different event types and payment scenarios. The enhanced layout systems and comprehensive modal architecture demonstrate sophisticated UI/UX patterns that can serve as a model for similar enterprise applications.
