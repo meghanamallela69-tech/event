@@ -536,59 +536,121 @@ const EventDetailsModal = ({ isOpen, onClose, event, onBookNow }) => {
           }}>
             <div style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "24px"
+              flexDirection: "column",
+              gap: "16px"
             }}>
-              <div>
-                <p style={{ 
-                  color: "#6b7280",
-                  fontSize: "14px",
-                  marginBottom: "4px"
-                }}>
-                  Price per person
-                </p>
-                <p style={{ 
-                  fontSize: "32px",
-                  fontWeight: "700",
-                  color: "#374151"
-                }}>
-                  {event.price > 0 ? `₹${event.price.toLocaleString()}` : "FREE"}
-                </p>
+              {/* Price Row */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}>
+                <div>
+                  <p style={{ 
+                    color: "#6b7280",
+                    fontSize: "14px",
+                    marginBottom: "4px"
+                  }}>
+                    Price per person
+                  </p>
+                  <p style={{ 
+                    fontSize: "32px",
+                    fontWeight: "700",
+                    color: "#374151"
+                  }}>
+                    {event.price > 0 ? `₹${event.price.toLocaleString()}` : "FREE"}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => onBookNow(event)}
-                disabled={status.label === 'Past' || status.label === 'Sold Out'}
-                style={{
-                  padding: "16px 32px",
-                  borderRadius: "12px",
-                  fontWeight: "600",
-                  fontSize: "16px",
-                  border: "none",
-                  cursor: status.label === 'Past' || status.label === 'Sold Out' ? "not-allowed" : "pointer",
-                  backgroundColor: status.label === 'Past' || status.label === 'Sold Out' ? "#d1d5db" : "#a2783a",
-                  color: status.label === 'Past' || status.label === 'Sold Out' ? "#6b7280" : "white",
-                  transition: "all 0.3s ease",
-                  transform: status.label === 'Past' || status.label === 'Sold Out' ? "none" : "translateY(0)",
-                }}
-                onMouseEnter={(e) => {
-                  if (status.label !== 'Past' && status.label !== 'Sold Out') {
-                    e.target.style.backgroundColor = "#92692d";
-                    e.target.style.transform = "translateY(-2px)";
-                    e.target.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (status.label !== 'Past' && status.label !== 'Sold Out') {
-                    e.target.style.backgroundColor = "#a2783a";
-                    e.target.style.transform = "translateY(0)";
-                    e.target.style.boxShadow = "none";
-                  }
-                }}
-              >
-                {status.label === 'Past' ? 'Event Ended' : 
-                 status.label === 'Sold Out' ? 'Sold Out' : 'Book Now'}
-              </button>
+              
+              {/* Action Buttons */}
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px"
+              }}>
+                <button
+                  onClick={() => onBookNow(event)}
+                  disabled={status.label === 'Past' || status.label === 'Sold Out'}
+                  style={{
+                    padding: "16px 32px",
+                    borderRadius: "12px",
+                    fontWeight: "600",
+                    fontSize: "16px",
+                    border: "none",
+                    cursor: status.label === 'Past' || status.label === 'Sold Out' ? "not-allowed" : "pointer",
+                    backgroundColor: status.label === 'Past' || status.label === 'Sold Out' ? "#d1d5db" : "#a2783a",
+                    color: status.label === 'Past' || status.label === 'Sold Out' ? "#6b7280" : "white",
+                    transition: "all 0.3s ease",
+                    transform: status.label === 'Past' || status.label === 'Sold Out' ? "none" : "translateY(0)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (status.label !== 'Past' && status.label !== 'Sold Out') {
+                      e.target.style.backgroundColor = "#92692d";
+                      e.target.style.transform = "translateY(-2px)";
+                      e.target.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (status.label !== 'Past' && status.label !== 'Sold Out') {
+                      e.target.style.backgroundColor = "#a2783a";
+                      e.target.style.transform = "translateY(0)";
+                      e.target.style.boxShadow = "none";
+                    }
+                  }}
+                >
+                  {status.label === 'Past' ? 'Event Ended' : 
+                   status.label === 'Sold Out' ? 'Sold Out' : 'Book Now'}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    // Check if user is logged in
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                      // Redirect to login
+                      window.location.href = '/login';
+                      return;
+                    }
+                    
+                    // Get merchant ID from event
+                    const merchantId = event.createdBy?._id || event.createdBy?.id;
+                    if (!merchantId) {
+                      alert('Merchant information not available');
+                      return;
+                    }
+                    
+                    // Navigate to messages page with merchant info
+                    window.location.href = `/dashboard/user/messages?merchantId=${merchantId}&merchantName=${encodeURIComponent(event.createdBy.name)}`;
+                  }}
+                  disabled={status.label === 'Past' || status.label === 'Sold Out'}
+                  style={{
+                    padding: "14px 32px",
+                    borderRadius: "12px",
+                    fontWeight: "600",
+                    fontSize: "15px",
+                    border: "2px solid #a2783a",
+                    cursor: status.label === 'Past' || status.label === 'Sold Out' ? "not-allowed" : "pointer",
+                    backgroundColor: "white",
+                    color: status.label === 'Past' || status.label === 'Sold Out' ? "#6b7280" : "#a2783a",
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (status.label !== 'Past' && status.label !== 'Sold Out') {
+                      e.target.style.backgroundColor = "#a2783a";
+                      e.target.style.color = "white";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (status.label !== 'Past' && status.label !== 'Sold Out') {
+                      e.target.style.backgroundColor = "white";
+                      e.target.style.color = "#a2783a";
+                    }
+                  }}
+                >
+                  💬 Message Merchant
+                </button>
+              </div>
             </div>
           </div>
         </div>

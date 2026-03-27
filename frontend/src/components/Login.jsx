@@ -30,7 +30,18 @@ const Login = () => {
         toast.success(res.data.message);
         login(res.data.token, res.data.user);
         
-        // Check for redirect after login
+        // Check for booking redirect first (highest priority)
+        const bookingRedirect = localStorage.getItem('bookingRedirect');
+        if (bookingRedirect) {
+          console.log("Booking redirect found, redirecting to browse events...");
+          // Don't clear it here - let the UserBrowseEvents page handle it
+          navigate('/dashboard/user/browse');
+          setEmail("");
+          setPassword("");
+          return;
+        }
+        
+        // Check for redirect from location state
         const from = location.state?.from;
         
         console.log("User role:", res.data.user.role);

@@ -266,6 +266,7 @@ const ServiceDetails = () => {
           toast.success("Booking confirmed!");
           setIsBookingModalOpen(false);
         }}
+        coupons={service.coupons || []}
       />
     </div>
   );

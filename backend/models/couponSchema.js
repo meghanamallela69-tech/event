@@ -60,7 +60,31 @@ const couponSchema = new mongoose.Schema(
       ref: "User",
       required: true
     },
-    // Optional: Restrict to specific events or categories
+    // Coupon applicability type
+    applyTo: {
+      type: String,
+      enum: ["ALL", "EVENT"],
+      required: true,
+      default: "ALL"
+    },
+    // Event this coupon is linked to (required when applyTo = "EVENT")
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Event",
+      default: null
+    },
+    // Merchant who created this coupon (for filtering)
+    merchantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    // Category this coupon applies to (for service-based filtering)
+    category: {
+      type: String,
+      trim: true,
+      default: null
+    },
+    // Optional: Restrict to specific events or categories (legacy support - will be deprecated)
     applicableEvents: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "Event"

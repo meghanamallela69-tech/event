@@ -45,6 +45,8 @@ import MerchantProfile from "./pages/dashboards/MerchantProfile";
 import MerchantSettings from "./pages/dashboards/MerchantSettings";
 import MerchantCategories from "./pages/dashboards/MerchantCategories";
 import UserPayments from "./pages/dashboards/UserPayments";
+import UserMessages from "./pages/dashboards/UserMessages";
+import MerchantMessages from "./pages/dashboards/MerchantMessages";
 
 import AdminMerchants from "./pages/dashboards/AdminMerchants";
 import AdminUsers from "./pages/dashboards/AdminUsers";
@@ -164,6 +166,18 @@ const AppContent = () => {
               <PrivateRoute>
                 <RoleRoute role="user">
                   <UserPayments />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          {/* USER DASHBOARD - MESSAGES */}
+          <Route
+            path="/dashboard/user/messages"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="user">
+                  <UserMessages />
                 </RoleRoute>
               </PrivateRoute>
             }
@@ -463,6 +477,18 @@ const AppContent = () => {
               <PrivateRoute>
                 <RoleRoute role="merchant">
                   <MerchantSettings />
+                </RoleRoute>
+              </PrivateRoute>
+            }
+          />
+
+          {/* MERCHANT DASHBOARD - MESSAGES */}
+          <Route
+            path="/dashboard/merchant/messages"
+            element={
+              <PrivateRoute>
+                <RoleRoute role="merchant">
+                  <MerchantMessages />
                 </RoleRoute>
               </PrivateRoute>
             }

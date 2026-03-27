@@ -1,27 +1,42 @@
 import mongoose from "mongoose";
-import validator from "validator";
 
-const messageSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Name Required!"],
-    minLength: [3, "Name must contain at least 3 characters!"],
+const messageSchema = new mongoose.Schema(
+  {
+    senderId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
+      required: true 
+    },
+    receiverId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
+      required: true 
+    },
+    content: { 
+      type: String, 
+      required: true,
+      trim: true,
+      maxlength: 2000
+    },
+    chatId: {
+      type: String,
+      required: true,
+      index: true
+    },
+    read: {
+      type: Boolean,
+      default: false
+    },
+    deletedBy: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    }]
   },
-  email: {
-    type: String,
-    required: [true, "Email Required!"],
-    validate: [validator.isEmail, "Please provide valid email!"],
-  },
-  subject: {
-    type: String,
-    required: [true, "Subject Required!"],
-    minLength: [5, "Subject must contain at least 5 characters!"],
-  },
-  message: {
-    type: String,
-    required: [true, "Message Required!"],
-    minLength: [10, "Message must contain at least 10 characters!"],
-  },
-});
+  { timestamps: true }
+);
+
+// Index for faster queries
+messageSchema.index({ chatId: 1, createdAt: -1 });
+messageSchema.index({ senderId: 1, receiverId: 1 });
 
 export const Message = mongoose.model("Message", messageSchema);

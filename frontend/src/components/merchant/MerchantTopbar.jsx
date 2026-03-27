@@ -166,8 +166,12 @@ const MerchantTopbar = ({ onToggleSidebar }) => {
                 setNotificationOpen(false);
               }}
             >
-              <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                {user?.name?.[0] || name[0]}
+              <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center overflow-hidden">
+                {user?.profileImage ? (
+                  <img src={user.profileImage} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  user?.name?.[0] || name[0]
+                )}
               </div>
               <span className="text-sm">{user?.name || name}</span>
               <FiChevronDown className={`transition-transform ${open ? 'rotate-180' : ''}`} />

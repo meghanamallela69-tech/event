@@ -62,6 +62,35 @@ const UserBrowseEvents = () => {
     filterEvents();
   }, [searchTerm, categoryFilter, dateFilter, events]);
 
+  // Check for booking redirect on mount
+  useEffect(() => {
+    const bookingRedirect = localStorage.getItem('bookingRedirect');
+    if (bookingRedirect) {
+      try {
+        const { eventId, eventTitle } = JSON.parse(bookingRedirect);
+        
+        // Clear the redirect immediately to prevent loops
+        localStorage.removeItem('bookingRedirect');
+        
+        // Show message about redirect
+        toast.success(`Welcome back! Continue booking: ${eventTitle}`);
+        
+        // Find and select the event
+        const eventToBook = events.find(e => e._id === eventId);
+        if (eventToBook) {
+          setSelectedEvent(eventToBook);
+          setBookingModalOpen(true);
+        } else {
+          // Event not loaded yet, will be handled when events load
+          console.log('Event not in current list, waiting for events to load...');
+        }
+      } catch (error) {
+        console.error('Error parsing booking redirect:', error);
+        localStorage.removeItem('bookingRedirect');
+      }
+    }
+  }, [events]);
+
   const fetchEvents = async () => {
     try {
       const response = await axios.get(`${API_BASE}/events`, {
@@ -129,6 +158,25 @@ const UserBrowseEvents = () => {
   };
 
   const handleBookNow = (event) => {
+    // Check if user is logged in
+    const user = localStorage.getItem('user');
+    
+    if (!user) {
+      // User not logged in - redirect to login with event ID for redirect
+      toast.success("Please login to book this event");
+      
+      // Store event ID for redirect after login
+      localStorage.setItem('bookingRedirect', JSON.stringify({
+        eventId: event._id,
+        eventTitle: event.title
+      }));
+      
+      // Redirect to login page
+      navigate('/login');
+      return;
+    }
+    
+    // User is logged in - open booking modal directly
     setSelectedEvent(event);
     setBookingModalOpen(true);
   };
@@ -456,6 +504,7 @@ const UserBrowseEvents = () => {
             ticketTypes: selectedEvent.ticketTypes,
             addons: selectedEvent.addons
           }}
+          coupons={selectedEvent.coupons || []}
           onBookingSuccess={handleBookingSuccess}
         />
       )}

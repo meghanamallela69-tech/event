@@ -82,6 +82,7 @@ export const createEvent = async (req, res) => {
       date: date ? new Date(date) : null,
       time: time || "",
       duration: Number(duration) || 1,
+      ticketedEventType: isTicketed ? (req.body.ticketedEventType || "upcoming") : undefined,
       totalTickets: tickets,
       availableTickets: tickets,
       ticketPrice: lowestTicketPrice,

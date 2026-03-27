@@ -6,16 +6,51 @@ import { API_BASE } from "../lib/http";
 import useAuth from "../context/useAuth";
 import PaymentModal from "./PaymentModal";
 
-const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
+const BookingModal = ({ service, isOpen, onClose, onSuccess, coupons = [] }) => {
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
   
+  // Coupon states - fetch from API if not passed as props
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [showCouponDropdown, setShowCouponDropdown] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  
   // Determine event type
   const eventType = service?.eventType || "full-service";
   const isFullService = eventType === "full-service";
   const isTicketed = eventType === "ticketed";
+  
+  // Fetch coupons from API when modal opens
+  useEffect(() => {
+    if (isOpen && service && service._id) {
+      console.log('🔍 FETCHING COUPONS for service:', service.title, '| ID:', service._id);
+      fetchAvailableCoupons();
+    } else {
+      console.log('⚠️ Modal not ready - isOpen:', isOpen, '| has service:', !!service, '| has serviceId:', service?._id);
+    }
+  }, [isOpen, service]);
+  
+  // Debug log for received coupons
+  useEffect(() => {
+    if (isOpen) {
+      console.log('=== BOOKING MODAL DEBUG ===');
+      console.log('Service:', service);
+      console.log('Coupons received as props:', coupons);
+      console.log('Number of prop coupons:', coupons.length);
+      console.log('API fetched coupons:', availableCoupons);
+      console.log('Total available coupons:', availableCoupons.length);
+    }
+  }, [isOpen, service, coupons, availableCoupons]);
+  
+  // Filter valid coupons (not expired and active)
+  const validCoupons = coupons.filter(coupon => {
+    const isExpired = new Date(coupon.expiryDate) < new Date();
+    return !isExpired && coupon.isActive !== false;
+  });
 
   // Full Service States
   const [eventDate, setEventDate] = useState("");
@@ -111,8 +146,101 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
       setDiscount(0);
       setShowPayment(false);
       setCreatedBooking(null);
+      setAppliedCoupon(null);
+      setCouponCode("");
+      // Don't clear availableCoupons - they will be refetched by the effect below
     }
   }, [isOpen]);
+
+  // Fetch coupons when modal is open and service is available
+  useEffect(() => {
+    if (isOpen && service && service._id) {
+      console.log('🎫 === FETCHING COUPONS ===');
+      console.log('   Service:', service.title);
+      console.log('   Service ID:', service._id);
+      console.log('   Category:', service.category);
+      fetchAvailableCoupons();
+    }
+  }, [isOpen, service]);
+
+  // Fetch available coupons from API based on service category
+  const fetchAvailableCoupons = async () => {
+    try {
+      if (!service || !service._id) {
+        console.log('⚠️ No service available for coupon fetch');
+        setAvailableCoupons([]);
+        return;
+      }
+      
+      // Calculate total amount safely
+      let amount = 1000; // Default minimum
+      try {
+        amount = calculateTotal() || 1000;
+      } catch (e) {
+        console.log('⚠️ calculateTotal not available, using default:', 1000);
+      }
+      
+      // Get service category for filtering
+      const serviceCategory = service.category || service.serviceType || '';
+      
+      // Use eventId if service has it, otherwise use service._id
+      const serviceOrEventId = service.eventId || service._id;
+      
+      // Build URL with category parameter for dynamic filtering
+      const url = `${API_BASE}/coupons/available?eventId=${serviceOrEventId}&totalAmount=${amount}&category=${encodeURIComponent(serviceCategory)}`;
+      
+      console.log('🎫 === COUPON FETCH STARTED ===');
+      console.log('   Service:', service.title);
+      console.log('   Service Category:', serviceCategory);
+      console.log('   Service ID:', service._id);
+      console.log('   Using Event ID:', serviceOrEventId);
+      console.log('   Amount:', amount);
+      console.log('   API URL:', url);
+      console.log('   Has Token:', !!token);
+      
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('📦 API Response:', response.data);
+      
+      if (response.data && response.data.success) {
+        const coupons = response.data.coupons || [];
+        console.log('✅ SUCCESS! Found', coupons.length, 'coupons for category:', serviceCategory);
+        
+        // Log each coupon with category info
+        coupons.forEach((coupon, idx) => {
+          console.log(`   [${idx}] ${coupon.code} | Category: ${coupon.category || 'N/A'} | ${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : '₹'} | Min: ₹${coupon.minAmount}`);
+        });
+        
+        setAvailableCoupons(coupons);
+        setShowCouponDropdown(coupons.length > 0);
+        
+        if (coupons.length === 0) {
+          console.log('💡 No coupons available for this category. Make sure merchant created coupons for:', serviceCategory);
+        }
+      } else {
+        console.warn('⚠️ API returned success=false:', response.data);
+        setAvailableCoupons([]);
+        setShowCouponDropdown(false);
+      }
+    } catch (error) {
+      console.error('❌ COUPON FETCH FAILED:', error.message);
+      
+      if (error.response) {
+        console.error('   HTTP Status:', error.response.status);
+        console.error('   Response Data:', error.response.data);
+      } else if (error.request) {
+        console.error('   No response received from server');
+        console.error('   Check if backend is running on correct port');
+      }
+      
+      setAvailableCoupons([]);
+      setShowCouponDropdown(false);
+      
+      toast.error('Unable to load coupons');
+    }
+  };
 
   if (!isOpen || !service) return null;
 
@@ -729,12 +857,63 @@ const BookingModal = ({ service, isOpen, onClose, onSuccess }) => {
                       <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
                         Have a promo code?
                       </label>
+                      
+                      {/* Show available coupons if any */}
+                      {availableCoupons.length > 0 && (
+                        <div style={{ marginBottom: "12px" }}>
+                          <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "6px" }}>
+                            🏷️ Available offers ({availableCoupons.length}):
+                          </p>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                            {availableCoupons.map((coupon) => (
+                              <button
+                                key={coupon._id}
+                                type="button"
+                                onClick={() => {
+                                  setPromoCode(coupon.code);
+                                  toast.success(`Coupon "${coupon.code}" selected! Click Apply to use it.`);
+                                }}
+                                style={{
+                                  padding: "6px 12px",
+                                  backgroundColor: "#fef3c7",
+                                  border: "1px solid #f59e0b",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: "600",
+                                  color: "#92400e",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = "#fde68a";
+                                  e.target.style.transform = "translateY(-1px)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = "#fef3c7";
+                                  e.target.style.transform = "translateY(0)";
+                                }}
+                              >
+                                {coupon.code} - {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`} Off
+                                {coupon.minAmount > 0 && ` (Min: ₹${coupon.minAmount})`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Show message if no coupons available */}
+                      {availableCoupons.length === 0 && (
+                        <p style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "8px" }}>
+                          No offers available for this event
+                        </p>
+                      )}
+                      
                       <div style={{ display: "flex", gap: "8px" }}>
                         <input
                           type="text"
                           value={promoCode}
                           onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                          placeholder="Enter code (e.g., EVENT10)"
+                          placeholder="Enter code or select from above"
                           style={{
                             flex: 1,
                             padding: "10px 12px",

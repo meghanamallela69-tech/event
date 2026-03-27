@@ -15,6 +15,8 @@ export const createPromoCode = async (req, res) => {
       expiryDate,
       usageLimit,
       description,
+      applyTo, // "ALL" or "EVENT"
+      eventId, // Required when applyTo = "EVENT"
       applicableEvents,
       applicableCategories
     } = req.body;
@@ -25,6 +27,42 @@ export const createPromoCode = async (req, res) => {
         success: false,
         message: "Missing required fields"
       });
+    }
+
+    // Validate applyTo field
+    const validApplyToValues = ["ALL", "EVENT"];
+    const couponApplyTo = applyTo || "ALL"; // Default to ALL if not provided
+    
+    if (!validApplyToValues.includes(couponApplyTo)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid applyTo value. Must be 'ALL' or 'EVENT'"
+      });
+    }
+
+    // Validate eventId when applyTo is EVENT
+    if (couponApplyTo === "EVENT" && !eventId) {
+      return res.status(400).json({
+        success: false,
+        message: "eventId is required when applyTo is 'EVENT'"
+      });
+    }
+
+    // Verify event exists and belongs to this merchant when applyTo is EVENT
+    if (couponApplyTo === "EVENT" && eventId) {
+      const event = await Event.findById(eventId);
+      if (!event) {
+        return res.status(404).json({
+          success: false,
+          message: "Event not found"
+        });
+      }
+      if (event.createdBy.toString() !== merchantId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only create coupons for your own events"
+        });
+      }
     }
 
     // Check if code already exists
@@ -44,8 +82,8 @@ export const createPromoCode = async (req, res) => {
       });
     }
 
-    // Create coupon
-    const coupon = await Coupon.create({
+    // Create coupon with new schema
+    const couponData = {
       code: code.toUpperCase(),
       discountType,
       discountValue,
@@ -55,9 +93,19 @@ export const createPromoCode = async (req, res) => {
       usageLimit,
       description,
       createdBy: merchantId,
+      merchantId: merchantId,
+      applyTo: couponApplyTo,
+      eventId: couponApplyTo === "EVENT" ? eventId : null,
       applicableEvents: applicableEvents || [],
       applicableCategories: applicableCategories || []
-    });
+    };
+
+    // For backward compatibility - add eventId to applicableEvents array
+    if (couponApplyTo === "EVENT" && eventId) {
+      couponData.applicableEvents = [eventId];
+    }
+
+    const coupon = await Coupon.create(couponData);
 
     return res.status(201).json({
       success: true,
@@ -80,7 +128,8 @@ export const getMerchantPromoCodes = async (req, res) => {
 
     const coupons = await Coupon.find({ createdBy: merchantId })
       .sort({ createdAt: -1 })
-      .populate("applicableEvents", "title");
+      .populate("applicableEvents", "title")
+      .populate("eventId", "title");
 
     // Add computed fields
     const couponsWithStats = coupons.map(coupon => ({

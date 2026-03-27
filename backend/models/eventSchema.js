@@ -13,7 +13,8 @@ const eventSchema = new mongoose.Schema(
     date: { type: Date, default: null },
     time: { type: String, default: "" },
     duration: { type: Number, default: 1 },
-    // Ticketed event fields
+    // Ticketed event fields - NEW
+    ticketedEventType: { type: String, enum: ["live", "upcoming"], default: "upcoming" },
     totalTickets: { type: Number, default: 0 },
     availableTickets: { type: Number, default: 0 },
     ticketPrice: { type: Number, default: 0 },

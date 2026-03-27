@@ -25,7 +25,23 @@ const UserEventDetails = () => {
   useEffect(() => {
     fetchEventDetails();
     checkRegistration();
-  }, [eventId]);
+    
+    // Check if there's a booking redirect after login
+    const bookingRedirect = localStorage.getItem('bookingRedirect');
+    if (bookingRedirect && token) {
+      try {
+        const { eventId: redirectEventId } = JSON.parse(bookingRedirect);
+        // Only open modal if this is the same event
+        if (redirectEventId === eventId) {
+          setBookingModalOpen(true);
+          localStorage.removeItem('bookingRedirect');
+        }
+      } catch (error) {
+        console.error('Error parsing booking redirect:', error);
+        localStorage.removeItem('bookingRedirect');
+      }
+    }
+  }, [eventId, token]);
 
   const fetchEventDetails = async () => {
     try {
@@ -71,6 +87,22 @@ const UserEventDetails = () => {
       toast.info("You are already registered for this event");
       return;
     }
+    
+    // Check if user is logged in
+    const storedToken = localStorage.getItem("token");
+    const isLoggedIn = storedToken || token;
+    
+    if (!isLoggedIn) {
+      // User is not logged in - save event info and redirect to login
+      localStorage.setItem('bookingRedirect', JSON.stringify({
+        eventId: event._id,
+        eventTitle: event.title
+      }));
+      navigate("/login");
+      toast.success("Please login to book this event");
+      return;
+    }
+    
     setBookingModalOpen(true);
   };
 
@@ -380,6 +412,7 @@ const UserEventDetails = () => {
             eventType: event.eventType,
             ticketTypes: event.ticketTypes
           }}
+          coupons={event.coupons || []}
           onBookingSuccess={handleBookingSuccess}
         />
       )}

@@ -11,7 +11,9 @@ import {
   deleteCoupon,
   toggleCouponStatus,
   getCouponStats,
-  validateCoupon
+  validateCoupon,
+  recordCouponUsage,
+  getUserCouponUsage
 } from "../controller/couponController.js";
 
 const router = express.Router();
@@ -23,6 +25,8 @@ router.post("/validate", auth, validateCoupon);
 router.post("/apply", auth, applyCoupon);
 router.post("/remove", auth, removeCoupon);
 router.get("/available", auth, getAvailableCoupons);
+router.post("/record-usage", auth, recordCouponUsage);
+router.get("/my-usage", auth, getUserCouponUsage);
 
 // Admin routes - Manage coupons
 router.post("/create", auth, ensureRole("admin"), createCoupon);

@@ -69,6 +69,8 @@ const MerchantCreateEvent = () => {
     date: "",
     time: "",
     duration: "1",
+    // ticketed event type
+    ticketedEventType: "upcoming", // "live" or "upcoming"
   });
 
   // Ticket types state — pre-seeded with Regular & VIP
@@ -193,6 +195,7 @@ const MerchantCreateEvent = () => {
         formData.append("date", form.date);
         formData.append("time", form.time);
         formData.append("duration", form.duration || 1);
+        formData.append("ticketedEventType", form.ticketedEventType || "upcoming"); // NEW FIELD
         formData.append("ticketTypes", JSON.stringify(
           ticketTypes.map((t) => ({
             name: t.name.trim(),
@@ -357,6 +360,46 @@ const MerchantCreateEvent = () => {
                 <h3 className="font-semibold text-purple-800 flex items-center gap-2">
                   <FaTicketAlt /> Ticketed Event Details
                 </h3>
+
+                {/* Event Type Selection (Live/Upcoming) - NEW */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Event Status *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="relative flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:bg-purple-50 hover:border-purple-400 bg-white">
+                      <input
+                        type="radio"
+                        name="ticketedEventType"
+                        value="live"
+                        checked={form.ticketedEventType === "live"}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                      />
+                      <div className="flex-1">
+                        <span className="font-semibold text-gray-800">Live Event</span>
+                        <p className="text-xs text-gray-500 mt-1">Happening right now</p>
+                      </div>
+                      <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+                    </label>
+
+                    <label className="relative flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:bg-purple-50 hover:border-purple-400 bg-white">
+                      <input
+                        type="radio"
+                        name="ticketedEventType"
+                        value="upcoming"
+                        checked={form.ticketedEventType === "upcoming"}
+                        onChange={handleChange}
+                        className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                      />
+                      <div className="flex-1">
+                        <span className="font-semibold text-gray-800">Upcoming Event</span>
+                        <p className="text-xs text-gray-500 mt-1">Scheduled for the future</p>
+                      </div>
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    </label>
+                  </div>
+                </div>
 
                 {/* Date + Time */}
                 <div className="grid grid-cols-2 gap-4">

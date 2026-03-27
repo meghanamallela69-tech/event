@@ -141,23 +141,24 @@ const Services = () => {
     toast.success("Booking confirmed! Check your dashboard for details.");
   };
 
-  // Check for pending booking after login
+  // Check for pending booking after login - watch token changes
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
     const pendingBooking = localStorage.getItem("pendingBooking");
     
-    if (storedToken && pendingBooking) {
+    if (storedToken && token && pendingBooking) {
       try {
         const service = JSON.parse(pendingBooking);
         setSelectedService(service);
         setIsBookingModalOpen(true);
         localStorage.removeItem("pendingBooking");
+        toast.success("Welcome back! Continue your booking");
       } catch (e) {
         console.error("Failed to parse pending booking:", e);
         localStorage.removeItem("pendingBooking");
       }
     }
-  }, []);
+  }, [token]); // Re-run when token changes
 
   // Filter services based on all criteria
   const filteredItems = services.filter((item) => {
@@ -658,6 +659,7 @@ const Services = () => {
           setSelectedService(null);
         }}
         onSuccess={handleBookingSuccess}
+        coupons={selectedService?.coupons || []}
       />
 
       {/* Event Details Modal */}

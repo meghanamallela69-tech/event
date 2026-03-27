@@ -1,70 +1,71 @@
-import axios from "axios";
-import dotenv from "dotenv";
+import axios from 'axios';
 
-dotenv.config({ path: "./config/config.env" });
-
-const API_BASE = "http://localhost:4001/api/v1";
-
-// Test user credentials
-const testUser = {
-  email: "user@test.com",
-  password: "User@123"
-};
-
-const testCouponAPI = async () => {
+// Test coupon API for Wedding event
+const testWeddingCoupons = async () => {
   try {
-    console.log("🧪 Testing Coupon API Endpoints");
-    console.log("================================");
+    console.log('\n=== TESTING WEDDING EVENT COUPONS ===\n');
     
-    // Step 1: Login to get token
-    console.log("\n1. Logging in as test user...");
-    const loginResponse = await axios.post(`${API_BASE}/auth/login`, testUser);
-    
-    if (!loginResponse.data.success) {
-      throw new Error("Login failed");
-    }
-    
-    const token = loginResponse.data.token;
-    const headers = { Authorization: `Bearer ${token}` };
-    console.log("✅ Login successful");
-    
-    // Step 2: Get available coupons
-    console.log("\n2. Fetching available coupons...");
-    const couponsResponse = await axios.get(`${API_BASE}/coupons/available?totalAmount=200`, {
-      headers
+    // First, login to get token
+    const loginResponse = await axios.post('http://localhost:5000/api/auth/login', {
+      email: 'user@gmail.com',
+      password: 'password'
     });
     
-    console.log("✅ Available coupons:", couponsResponse.data);
+    const token = loginResponse.data.token;
+    console.log('✅ Logged in successfully\n');
     
-    if (couponsResponse.data.coupons && couponsResponse.data.coupons.length > 0) {
-      const testCoupon = couponsResponse.data.coupons[0];
-      
-      // Step 3: Validate coupon
-      console.log(`\n3. Validating coupon: ${testCoupon.code}`);
-      const validateResponse = await axios.post(`${API_BASE}/coupons/validate`, {
-        couponCode: testCoupon.code,
-        amount: 200
-      }, { headers });
-      
-      console.log("✅ Coupon validation:", validateResponse.data);
-      
-      // Step 4: Apply coupon
-      console.log(`\n4. Applying coupon: ${testCoupon.code}`);
-      const applyResponse = await axios.post(`${API_BASE}/coupons/apply`, {
-        code: testCoupon.code,
-        totalAmount: 200
-      }, { headers });
-      
-      console.log("✅ Coupon application:", applyResponse.data);
+    // Test Wedding Event coupons
+    console.log('Testing Wedding Event (69b799063ddecddff43583f5)...');
+    const weddingResponse = await axios.get(
+      'http://localhost:5000/api/coupons/available?eventId=69b799063ddecddff43583f5&totalAmount=50000',
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+    
+    console.log('Wedding Event Response:');
+    console.log(JSON.stringify(weddingResponse.data, null, 2));
+    
+    if (weddingResponse.data.coupons && weddingResponse.data.coupons.length > 0) {
+      console.log('\n✅ SUCCESS! Found', weddingResponse.data.coupons.length, 'coupon(s)');
+      weddingResponse.data.coupons.forEach(c => {
+        console.log(`  - ${c.code}: ${c.discountValue}% off (min: ₹${c.minAmount})`);
+      });
     } else {
-      console.log("⚠️ No available coupons found");
+      console.log('\n❌ NO COUPONS FOUND for Wedding event!');
     }
     
-    console.log("\n✅ All coupon API tests completed successfully!");
+    // Test Music Event coupons
+    console.log('\nTesting Music Event (69b799843ddecddff4358402)...');
+    const musicResponse = await axios.get(
+      'http://localhost:5000/api/coupons/available?eventId=69b799843ddecddff4358402&totalAmount=5000',
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+    
+    console.log('Music Event Response:');
+    console.log(JSON.stringify(musicResponse.data, null, 2));
+    
+    if (musicResponse.data.coupons && musicResponse.data.coupons.length > 0) {
+      console.log('\n✅ SUCCESS! Found', musicResponse.data.coupons.length, 'coupon(s)');
+      musicResponse.data.coupons.forEach(c => {
+        console.log(`  - ${c.code}: ${c.discountValue}% off (min: ₹${c.minAmount})`);
+      });
+    } else {
+      console.log('\n❌ NO COUPONS FOUND for Music event!');
+    }
     
   } catch (error) {
-    console.error("❌ Coupon API test failed:", error.response?.data || error.message);
+    console.error('❌ Error:', error.message);
+    if (error.response) {
+      console.error('Response:', error.response.data);
+    }
   }
 };
 
-testCouponAPI();
+testWeddingCoupons();

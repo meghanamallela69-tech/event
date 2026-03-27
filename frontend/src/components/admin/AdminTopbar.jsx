@@ -161,7 +161,13 @@ const AdminTopbar = ({ onToggleSidebar, profileName = "Admin", onLogout }) => {
                 setNotificationOpen(false);
               }}
             >
-              <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center">{user?.name?.[0] || profileName[0]}</div>
+              <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center overflow-hidden">
+                {user?.profileImage ? (
+                  <img src={user.profileImage} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  user?.name?.[0] || profileName[0]
+                )}
+              </div>
               <span className="text-sm">{user?.name || profileName}</span>
               <FiChevronDown className={`transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>

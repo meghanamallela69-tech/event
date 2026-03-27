@@ -25,7 +25,9 @@ const MerchantMarketing = () => {
     minAmount: "",
     expiryDate: "",
     usageLimit: "",
-    description: ""
+    description: "",
+    applyTo: "ALL", // "ALL" or "EVENT"
+    eventId: null
   });
 
   // Notification form state
@@ -38,9 +40,19 @@ const MerchantMarketing = () => {
   const [shareLinks, setShareLinks] = useState(null);
 
   useEffect(() => {
+    console.log('🔄 Component mounted, loading data...');
     loadPromoCodes();
     loadMerchantEvents();
   }, []);
+  
+  // Debug: Log when events change
+  useEffect(() => {
+    if (events.length > 0) {
+      console.log('✅ Events state updated:', events.length, 'events available in dropdown');
+    } else if (events.length === 0 && promoForm.applyTo === "EVENT") {
+      console.warn('⚠️ No events loaded but "Specific Event" is selected');
+    }
+  }, [events, promoForm.applyTo]);
 
   // Load promo codes
   const loadPromoCodes = async () => {
@@ -64,15 +76,27 @@ const MerchantMarketing = () => {
   // Load merchant events
   const loadMerchantEvents = async () => {
     try {
+      console.log('🔍 Loading merchant events...');
       const response = await axios.get(
         `${API_BASE}/merchant/events`,
         { headers: authHeaders(token) }
       );
+      console.log('📦 Events API Response:', response.data);
       if (response.data.success) {
-        setEvents(response.data.events || []);
+        const eventsList = response.data.events || [];
+        console.log('✅ Events loaded:', eventsList.length, 'events');
+        console.log('Events data:', eventsList);
+        setEvents(eventsList);
+      } else {
+        console.error('❌ Events API returned success=false');
       }
     } catch (error) {
-      console.error("Failed to load events:", error);
+      console.error("❌ Failed to load events:", error.message);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
+      toast.error("Failed to load your events. Please refresh the page.");
     }
   };
 
@@ -80,10 +104,20 @@ const MerchantMarketing = () => {
   const handleCreatePromoCode = async (e) => {
     e.preventDefault();
     
+    console.log('📤 Submitting coupon form:', promoForm);
+    
     if (!promoForm.code || !promoForm.discountValue || !promoForm.expiryDate || !promoForm.usageLimit) {
       toast.error("Please fill all required fields");
       return;
     }
+    
+    // Validate eventId when applyTo is EVENT
+    if (promoForm.applyTo === "EVENT" && !promoForm.eventId) {
+      toast.error("Please select an event");
+      return;
+    }
+    
+    console.log('✅ Form validated, sending to API...');
 
     try {
       const response = await axios.post(
@@ -91,6 +125,8 @@ const MerchantMarketing = () => {
         promoForm,
         { headers: authHeaders(token) }
       );
+      
+      console.log('📥 API Response:', response.data);
 
       if (response.data.success) {
         toast.success("Promo code created successfully!");
@@ -102,7 +138,9 @@ const MerchantMarketing = () => {
           minAmount: "",
           expiryDate: "",
           usageLimit: "",
-          description: ""
+          description: "",
+          applyTo: "ALL",
+          eventId: null
         });
         setShowCreateForm(false);
         loadPromoCodes();
@@ -384,6 +422,71 @@ const MerchantMarketing = () => {
                       required
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Apply To *</label>
+                    <select
+                      value={promoForm.applyTo}
+                      onChange={(e) => {
+                        const selectedValue = e.target.value;
+                        console.log('🎯 Apply To changed to:', selectedValue);
+                        setPromoForm({ 
+                          ...promoForm, 
+                          applyTo: selectedValue,
+                          eventId: selectedValue === "ALL" ? null : promoForm.eventId 
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="ALL">All Events</option>
+                      <option value="EVENT">Specific Event</option>
+                    </select>
+                  </div>
+                  
+                  {promoForm.applyTo === "EVENT" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Event *</label>
+                      <select
+                        value={promoForm.eventId || ""}
+                        onChange={(e) => {
+                          const selectedEventId = e.target.value;
+                          console.log('📅 Selected Event ID:', selectedEventId);
+                          setPromoForm({ ...promoForm, eventId: selectedEventId });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Choose an event...</option>
+                        {events.length === 0 ? (
+                          <option disabled>No events available</option>
+                        ) : (
+                          events.map((event, index) => {
+                            console.log(`Event ${index}:`, event);
+                            return (
+                              <option key={event._id} value={event._id}>
+                                {event.title} {event.date ? `- ${new Date(event.date).toLocaleDateString()}` : ''}
+                              </option>
+                            );
+                          })
+                        )}
+                      </select>
+                      {events.length === 0 && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          ⚠️ You haven't created any events yet. <br/>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              console.log('Navigating to create event...');
+                              window.location.href = '/merchant/events/create';
+                            }}
+                            className="underline hover:text-orange-800"
+                          >
+                            Create your first event
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                     <textarea

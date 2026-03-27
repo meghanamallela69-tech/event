@@ -215,6 +215,7 @@ const MerchantProfile = () => {
                   </button>
                   <button
                     type="submit"
+                    form="profile-form"
                     disabled={loading}
                     className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
                   >
@@ -225,7 +226,7 @@ const MerchantProfile = () => {
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form id="profile-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>

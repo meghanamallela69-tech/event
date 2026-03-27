@@ -85,8 +85,25 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    discountAmount: {
+      type: Number,
+      default: 0
+    },
+    finalAmount: {
+      type: Number
+    },
     promoCode: {
       type: String
+    },
+    couponCode: {
+      type: String
+    },
+    couponDetails: {
+      couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon" },
+      code: { type: String },
+      discountType: { type: String, enum: ["fixed", "percentage"] },
+      discountValue: { type: Number },
+      appliedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" } // Merchant who created the coupon
     },
     guestCount: {
       type: Number,

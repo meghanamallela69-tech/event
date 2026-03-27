@@ -158,9 +158,11 @@ export const createBooking = async (req, res) => {
       // Add discount and promo code info (both optional)
       if (discount && discount > 0) {
         bookingData.discount = discount;
+        bookingData.discountAmount = discount;
       }
       if (promoCode && promoCode.trim()) {
         bookingData.promoCode = promoCode.trim();
+        bookingData.couponCode = promoCode.trim().toUpperCase();
       }
       
       // Set payment status for ticketed events
@@ -182,6 +184,13 @@ export const createBooking = async (req, res) => {
         paid: false,
         amount: finalTotalPrice
       };
+    }
+
+    // Apply discount to calculate final amount
+    if (discount && discount > 0) {
+      bookingData.finalAmount = Math.max(0, finalTotalPrice - discount);
+    } else {
+      bookingData.finalAmount = finalTotalPrice;
     }
 
     console.log("Creating booking with data:", JSON.stringify(bookingData, null, 2));
@@ -209,12 +218,23 @@ export const createBooking = async (req, res) => {
         });
 
         if (coupon) {
+          // Update booking with detailed coupon information
+          booking.couponCode = coupon.code;
+          booking.couponDetails = {
+            couponId: coupon._id,
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue,
+            appliedBy: coupon.createdBy // Merchant who created the coupon
+          };
+          await booking.save();
+
           // Update usage count
           coupon.usedCount += 1;
           
           // Add to usage history
           coupon.usageHistory.push({
-            user: userId,
+            user: authenticatedUserId,
             booking: booking._id,
             usedAt: new Date(),
             discountAmount: discount || 0

@@ -1,6 +1,7 @@
 import { Coupon } from "../models/couponSchema.js";
 import { Booking } from "../models/bookingSchema.js";
 import { Event } from "../models/eventSchema.js";
+import { CouponUsage } from "../models/couponUsageSchema.js";
 
 // Validate coupon without applying it
 export const validateCoupon = async (req, res) => {
@@ -65,12 +66,25 @@ export const validateCoupon = async (req, res) => {
       });
     }
 
-    // Check if user has already used this coupon
-    const existingUsage = coupon.usageHistory.find(
+    // Check if user has already used this coupon (check CouponUsage collection)
+    const existingUsage = await CouponUsage.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      couponId: coupon._id
+    });
+
+    if (existingUsage) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already used this coupon"
+      });
+    }
+
+    // Also check usageHistory in coupon for backward compatibility
+    const existingUsageInHistory = coupon.usageHistory.find(
       usage => usage.user.toString() === userId.toString()
     );
 
-    if (existingUsage) {
+    if (existingUsageInHistory) {
       return res.status(400).json({
         success: false,
         message: "You have already used this coupon"
@@ -193,12 +207,25 @@ export const applyCoupon = async (req, res) => {
       });
     }
 
-    // Check if user has already used this coupon
-    const existingUsage = coupon.usageHistory.find(
+    // Check if user has already used this coupon (check CouponUsage collection)
+    const existingUsage = await CouponUsage.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      couponId: coupon._id
+    });
+
+    if (existingUsage) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already used this coupon"
+      });
+    }
+
+    // Also check usageHistory in coupon for backward compatibility
+    const existingUsageInHistory = coupon.usageHistory.find(
       usage => usage.user.toString() === userId.toString()
     );
 
-    if (existingUsage) {
+    if (existingUsageInHistory) {
       return res.status(400).json({
         success: false,
         message: "You have already used this coupon"
@@ -311,11 +338,13 @@ export const removeCoupon = async (req, res) => {
 export const getAvailableCoupons = async (req, res) => {
   try {
     const userId = req.user.userId || req.user._id;
-    const { eventId, totalAmount } = req.query;
+    const { eventId, totalAmount, category, serviceId } = req.query;
 
     console.log(`=== GET AVAILABLE COUPONS ===`);
     console.log(`User ID: ${userId}`);
     console.log(`Event ID: ${eventId}`);
+    console.log(`Service ID: ${serviceId}`);
+    console.log(`Category: ${category}`);
     console.log(`Total Amount: ${totalAmount}`);
 
     if (!userId) {
@@ -326,7 +355,7 @@ export const getAvailableCoupons = async (req, res) => {
       });
     }
 
-    // Build query
+    // Build base query - only active, non-expired coupons
     const query = {
       isActive: true,
       expiryDate: { $gt: new Date() },
@@ -338,21 +367,100 @@ export const getAvailableCoupons = async (req, res) => {
       query.minAmount = { $lte: parseFloat(totalAmount) };
     }
 
-    // Add event filter if provided
-    if (eventId) {
-      query.$or = [
-        { applicableEvents: { $size: 0 } }, // No event restrictions
-        { applicableEvents: eventId } // Specific event
-      ];
+    // Note: Category filter will be applied after we know the merchant context
+
+    // Add event/service filter if provided
+    if (eventId || serviceId) {
+      const targetId = eventId || serviceId;
+      
+      // Try to find event first
+      let event = await Event.findById(targetId);
+      
+      if (event) {
+        const merchantId = event.createdBy;
+        
+        // Fetch coupons that apply to ALL events OR this specific event
+        query.merchantId = merchantId;
+        
+        console.log(`🎫 Event ID: ${targetId}`);
+        console.log(`🎫 Merchant ID: ${merchantId}`);
+        console.log(`🏷️ Requested Category: ${category || 'Any'}`);
+        
+        // Build $or query for applyTo
+        query.$or = [
+          { applyTo: "ALL" },
+          { applyTo: "EVENT", eventId: targetId }
+        ];
+        
+        // Add category filter if provided (case-insensitive, applies to ALL coupons)
+        if (category) {
+          const categoryRegex = new RegExp(category, 'i');
+          // Match ALL coupons where category matches OR is not set
+          // EVENT coupons show regardless of category (merchant intended for this specific event)
+          query.category = { $in: [null, "", { $exists: false }, categoryRegex] };
+          console.log(`🏷️ Category filter: ${category} (case-insensitive, includes null/empty)`);
+        }
+        
+        console.log(`🎫 Using $or query for applyTo + category logic`);
+        
+      } else {
+        // Event not found - might be a service or invalid ID
+        console.log(`⚠️ Event not found for ID: ${targetId}, fetching ALL category coupons`);
+        // Still fetch ALL coupons matching category without merchant restriction
+        if (category) {
+          query.category = new RegExp(category, 'i');
+        }
+        query.applyTo = "ALL";
+      }
+    } else {
+      // No event/service filter - just apply category if provided
+      if (category) {
+        query.category = new RegExp(category, 'i');
+        console.log(`🏷️ Filtering by category (regex): ${category}`);
+      }
     }
 
-    console.log("Query:", JSON.stringify(query, null, 2));
+    console.log("🎫 Final Query:", JSON.stringify(query, null, 2));
+
+    // First, let's see ALL active coupons for debugging
+    const allActiveCoupons = await Coupon.find({ 
+      isActive: true, 
+      expiryDate: { $gt: new Date() },
+      $expr: { $lt: ["$usedCount", "$usageLimit"] }
+    }).select('code eventId merchantId category isActive');
+    
+    console.log('\n📊 ALL ACTIVE COUPONS IN DB:');
+    allActiveCoupons.forEach(c => {
+      console.log(`  - ${c.code} | category: ${c.category || 'N/A'} | eventId: ${c.eventId} | merchantId: ${c.merchantId}`);
+    });
+    console.log('');
 
     const coupons = await Coupon.find(query)
-      .select('code discountType discountValue maxDiscount minAmount expiryDate description usedCount usageLimit usageHistory')
+      .select('code discountType discountValue maxDiscount minAmount expiryDate description usedCount usageLimit usageHistory category')
+      .populate('merchantId', 'name email')
       .sort({ discountValue: -1 });
 
-    console.log(`Found ${coupons.length} coupons before user filtering`);
+    console.log(`✅ Found ${coupons.length} coupons matching query`);
+    if (coupons.length > 0) {
+      console.log('🎫 MATCHED COUPONS BREAKDOWN:');
+      
+      // Separate ALL and EVENT coupons
+      const allCoupons = coupons.filter(c => c.applyTo === 'ALL');
+      const eventCoupons = coupons.filter(c => c.applyTo === 'EVENT');
+      
+      console.log(`   📢 applyTo ALL (${allCoupons.length}):`);
+      allCoupons.forEach(c => {
+        console.log(`      - ${c.code} | Category: ${c.category || 'N/A'} | ${c.discountValue}${c.discountType === 'percentage' ? '%' : '₹'} | Min: ₹${c.minAmount}`);
+      });
+      
+      console.log(`   🎯 applyTo EVENT (${eventCoupons.length}):`);
+      eventCoupons.forEach(c => {
+        console.log(`      - ${c.code} | Category: ${c.category || 'N/A'} | ${c.discountValue}${c.discountType === 'percentage' ? '%' : '₹'} | Min: ₹${c.minAmount}`);
+      });
+    } else {
+      console.log('⚠️ No coupons found matching query');
+      console.log('💡 TIP: Make sure coupons have category field matching your service category');
+    }
 
     // Filter out coupons already used by this user
     const availableCoupons = coupons.filter(coupon => {
@@ -746,12 +854,117 @@ export const getCouponStats = async (req, res) => {
       success: true,
       stats: result
     });
-
   } catch (error) {
     console.error("Get coupon stats error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch coupon statistics"
+      message: "Failed to get coupon stats",
+      error: error.message
+    });
+  }
+};
+
+// Record coupon usage after successful payment
+export const recordCouponUsage = async (req, res) => {
+  try {
+    const { userId, couponCode, bookingId, serviceId, discountAmount } = req.body;
+
+    console.log(`=== RECORD COUPON USAGE ===`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Coupon Code: ${couponCode}`);
+    console.log(`Booking ID: ${bookingId}`);
+    console.log(`Discount Amount: ${discountAmount}`);
+
+    if (!userId || !couponCode || !discountAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID, coupon code, and discount amount are required"
+      });
+    }
+
+    // Find the coupon
+    const coupon = await Coupon.findOne({ 
+      code: couponCode.toUpperCase()
+    });
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: "Coupon not found"
+      });
+    }
+
+    // Check if usage already exists
+    const existingUsage = await CouponUsage.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      couponId: coupon._id
+    });
+
+    if (existingUsage) {
+      return res.status(400).json({
+        success: false,
+        message: "Coupon usage already recorded for this user"
+      });
+    }
+
+    // Create coupon usage record
+    const usage = await CouponUsage.create({
+      userId: new mongoose.Types.ObjectId(userId),
+      couponId: coupon._id,
+      bookingId,
+      serviceId,
+      discountAmount
+    });
+
+    // Update coupon usedCount and usageHistory
+    coupon.usedCount += 1;
+    coupon.usageHistory.push({
+      user: new mongoose.Types.ObjectId(userId),
+      bookedAt: new Date(),
+      discountAmount
+    });
+    await coupon.save();
+
+    console.log(`Coupon usage recorded: ${usage._id}`);
+
+    return res.status(201).json({
+      success: true,
+      message: "Coupon usage recorded successfully",
+      usage
+    });
+  } catch (error) {
+    console.error("Record coupon usage error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to record coupon usage",
+      error: error.message
+    });
+  }
+};
+
+// Get coupon usage by user
+export const getUserCouponUsage = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const usages = await CouponUsage.find({
+      userId: new mongoose.Types.ObjectId(userId)
+    })
+    .populate('couponId', 'code name')
+    .populate('serviceId', 'title')
+    .sort({ usedAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      usages,
+      count: usages.length
+    });
+  } catch (error) {
+    console.error("Get user coupon usage error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get coupon usage",
+      error: error.message
     });
   }
 };

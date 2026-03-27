@@ -1,5 +1,8 @@
 import https from "https";
+import mongoose from "mongoose";
 import { Booking } from "../models/bookingSchema.js";
+import { CouponUsage } from "../models/couponUsageSchema.js";
+import { Coupon } from "../models/couponSchema.js";
 import { v4 as uuidv4 } from "uuid";
 
 const hasRazorpay = () =>
@@ -168,6 +171,47 @@ export const payForService = async (req, res) => {
 
     console.log(`✅ Service payment completed: ${paymentId}`);
 
+    // Record coupon usage if coupon was applied
+    if (booking.couponCode) {
+      try {
+        const coupon = await Coupon.findOne({ code: booking.couponCode.toUpperCase() });
+        if (coupon) {
+          // Check if usage already exists
+          const existingUsage = await CouponUsage.findOne({
+            userId: new mongoose.Types.ObjectId(userId),
+            couponId: coupon._id
+          });
+
+          if (!existingUsage) {
+            await CouponUsage.create({
+              userId: new mongoose.Types.ObjectId(userId),
+              couponId: coupon._id,
+              bookingId: booking._id,
+              serviceId: booking.serviceId || booking.eventId,
+              discountAmount: booking.discountAmount || 0
+            });
+            
+            // Update booking with detailed coupon information if not already set
+            if (!booking.couponDetails) {
+              booking.couponDetails = {
+                couponId: coupon._id,
+                code: coupon.code,
+                discountType: coupon.discountType,
+                discountValue: coupon.discountValue,
+                appliedBy: coupon.createdBy // Merchant who created the coupon
+              };
+              await booking.save();
+            }
+            
+            console.log(`Coupon usage recorded for user ${userId}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error recording coupon usage:", error);
+        // Don't fail the payment if coupon recording fails
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: "Payment successful! Your service booking is confirmed.",
@@ -256,6 +300,47 @@ export const payForTicket = async (req, res) => {
     await booking.save();
 
     console.log(`✅ Ticket payment completed and booking auto-completed: ${booking.paymentId}`);
+
+    // Record coupon usage if coupon was applied
+    if (booking.couponCode) {
+      try {
+        const coupon = await Coupon.findOne({ code: booking.couponCode.toUpperCase() });
+        if (coupon) {
+          // Check if usage already exists
+          const existingUsage = await CouponUsage.findOne({
+            userId: new mongoose.Types.ObjectId(userId),
+            couponId: coupon._id
+          });
+
+          if (!existingUsage) {
+            await CouponUsage.create({
+              userId: new mongoose.Types.ObjectId(userId),
+              couponId: coupon._id,
+              bookingId: booking._id,
+              serviceId: booking.eventId,
+              discountAmount: booking.discountAmount || 0
+            });
+            
+            // Update booking with detailed coupon information if not already set
+            if (!booking.couponDetails) {
+              booking.couponDetails = {
+                couponId: coupon._id,
+                code: coupon.code,
+                discountType: coupon.discountType,
+                discountValue: coupon.discountValue,
+                appliedBy: coupon.createdBy // Merchant who created the coupon
+              };
+              await booking.save();
+            }
+            
+            console.log(`Coupon usage recorded for user ${userId}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error recording coupon usage:", error);
+        // Don't fail the payment if coupon recording fails
+      }
+    }
 
     return res.status(200).json({
       success: true,

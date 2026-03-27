@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { RxDashboard } from "react-icons/rx";
 import { BsCalendarEvent, BsBookmarkHeart, BsSearch } from "react-icons/bs";
-import { FaUser, FaTicketAlt, FaHome, FaCreditCard } from "react-icons/fa";
+import { FaUser, FaTicketAlt, FaHome, FaCreditCard, FaEnvelope } from "react-icons/fa";
 import { FiBell, FiLogOut } from "react-icons/fi";
 import PropTypes from "prop-types";
 import axios from "axios";
@@ -38,25 +38,36 @@ Item.propTypes = {
 
 const UserSidebar = ({ onLogout }) => {
   const { token } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [messageCount, setMessageCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
-    loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 30000);
+    loadUnreadCounts();
+    const interval = setInterval(loadUnreadCounts, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
   }, [token]);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCounts = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/notifications/unread-counts`, { 
+      // Load message unread count
+      const msgResponse = await axios.get(`${API_BASE}/message/unread-count`, { 
         headers: authHeaders(token) 
       });
       
-      if (response.data.success) {
-        setUnreadCount(response.data.data?.totalUnread || 0);
+      if (msgResponse.data.success) {
+        setMessageCount(msgResponse.data.count || 0);
+      }
+      
+      // Load notification unread count
+      const notifResponse = await axios.get(`${API_BASE}/notifications/unread-counts`, { 
+        headers: authHeaders(token) 
+      });
+      
+      if (notifResponse.data.success) {
+        setNotificationCount(notifResponse.data.data?.totalUnread || 0);
       }
     } catch (error) {
-      console.error("Error loading unread count:", error);
+      console.error("Error loading unread counts:", error);
     }
   };
 
@@ -70,8 +81,19 @@ const UserSidebar = ({ onLogout }) => {
         <Item icon={BsSearch} label="Browse Events" to="/dashboard/user/browse" />
         <Item icon={FaTicketAlt} label="My Bookings" to="/dashboard/user/bookings" />
         <Item icon={FaCreditCard} label="Payments" to="/dashboard/user/payments" />
+        <Item 
+          icon={FaEnvelope} 
+          label="Messages" 
+          to="/dashboard/user/messages" 
+          badge={messageCount} 
+        />
         <Item icon={BsBookmarkHeart} label="Saved Events" to="/dashboard/user/saved" />
-        <Item icon={FiBell} label="Notifications" to="/dashboard/user/notifications" badge={unreadCount} />
+        <Item 
+          icon={FiBell} 
+          label="Notifications" 
+          to="/dashboard/user/notifications" 
+          badge={notificationCount} 
+        />
         <Item icon={FaUser} label="My Profile" to="/dashboard/user/profile" />
         <Item icon={FaHome} label="Back to Home" to="/home" />
       </div>
